@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+project_dir="$(cd -- "${script_dir}/.." && pwd)"
+vault="${1:-${TELAR_VAULT:-${project_dir}/help}}"
+port="${2:-${TELAR_PORT:-7731}}"
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  printf 'Usage: scripts/dev [vault] [port]\n'
+  exit 0
+fi
+if [[ ! -d "${vault}" ]]; then
+  printf 'The vault does not exist or is not a directory: %s\n' "${vault}" >&2
+  exit 2
+fi
+if [[ ! "${port}" =~ ^[0-9]+$ ]] || ((port < 1 || port > 65534)); then
+  printf 'The port must be a number between 1 and 65534: %s\n' "${port}" >&2
+  exit 2
+fi
+
+api_port=$((port + 1))
+cleanup() {
+  trap - EXIT INT TERM
+  kill "${api_pid:-}" "${vite_pid:-}" 2>/dev/null || true
+  wait "${api_pid:-}" "${vite_pid:-}" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+uv run --project "${project_dir}" python "${project_dir}/server.py" --vault "$(cd -- "${vault}" && pwd)" --port "${api_port}" --idle-timeout 0 &
+api_pid=$!
+TELAR_API_PORT="${api_port}" npm run dev -- --host 127.0.0.1 --port "${port}" &
+vite_pid=$!
+wait "${vite_pid}"

@@ -1,0 +1,56 @@
+/* ── Responsive floating panels & narrow viewports ── */
+/* Keep in sync with FLOATING_PANELS_QUERY in lib/layout.ts. */
+@media (max-width: 1100px) {
+  #main { position: relative; width: 100%; min-width: 0; }
+  #editor-col { width: 0; min-width: 0; max-width: 100%; }
+  #editor-area { width: 100%; min-width: 0; max-width: 100%; }
+  #app.explorer-open #tree-panel {
+    position: absolute; z-index: 40; inset: 0 auto 0 var(--rail-w);
+    width: min(var(--tree-width, 238px), calc(100vw - 68px));
+    box-shadow: 12px 0 28px #0005;
+  }
+  #app.explorer-open #resize-handle, #right-resize-handle { display: none; }
+  #explorer-scrim {
+    display: block; position: absolute; z-index: 30; inset: 0 0 0 var(--rail-w);
+    padding: 0; border: 0; background: #0004;
+  }
+  #right-panel.expanded {
+    position: absolute; z-index: 40; inset: 0 0 0 auto;
+    width: min(var(--right-width, 300px), calc(100vw - var(--rail-w)));
+    box-shadow: -12px 0 28px #0005;
+  }
+}
+
+@media (max-width: 800px) {
+  #md-format-buttons { justify-content: flex-start; overflow-x: auto; }
+  #app .cm-content { width: 100%; min-width: 0; }
+  #statusbar { min-width: 0; gap: 12px; }
+  #statusbar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cm-tasks-row { gap: 4px; }
+  .cm-tasks-row > select:not(.cm-tasks-status) { flex-basis: 27px; width: 27px; }
+  .cm-tasks-row > input[type='date'] { flex-basis: 100px; width: 100px; }
+}
+
+@media (max-width: 640px) {
+  .settings-dialog { grid-template: auto auto 1fr auto / 1fr; height: calc(100vh - 32px); }
+  .settings-nav { flex-direction: row; flex-wrap: nowrap; align-items: center; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .settings-nav-group { display: none; }
+  .settings-nav-item { flex: 0 0 auto; gap: 6px; }
+  .settings-nav .settings-import { flex: 0 0 auto; margin: 0 0 0 6px; }
+  .settings-row { flex-wrap: wrap; }
+  .settings-vaults li { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .settings-vaults li .settings-vault-meta { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  #app .cm-panels .cm-search { grid-template-columns: 1fr repeat(3, max-content); }
+  #app .cm-search label { grid-row: 3; }
+  #header { padding-inline: 8px; gap: 6px; }
+  #save-status { display: none; }
+  #vault-switcher { max-width: 120px; }
+  #statusbar span:last-child { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app input.settings-switch, #app input.settings-switch::after { transition: none; }
+}

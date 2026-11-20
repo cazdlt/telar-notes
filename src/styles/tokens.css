@@ -1,0 +1,211 @@
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: var(--font-ui); }
+
+/* ============================================================================
+   THEMING
+   Three orthogonal axes drive every color and font:
+     · data-aesthetic = ink | slate | sage   → palette identity + font trio
+     · data-theme     = dark | light          → luminance mode
+     · --font-size                            → editor scale
+   :root holds the DARK, INK defaults (the app's default look). Semantic tokens
+   that only depend on luminance (callouts, syntax highlight) live on the mode
+   selector; palette + fonts live on the aesthetic selectors, so the two axes
+   compose cleanly (3 × 2 = 6 skins from a small amount of CSS).
+   ============================================================================ */
+
+/* .theme-preview cards (Settings) reuse these palettes; :is() keeps the #app specificity. */
+:root, .theme-preview {
+  --content-width: 808px;
+  --font-size: 16px;
+  --rail-w: calc(44px * var(--ui-scale, 1));
+
+  /* Ink — the default identity (Fraunces display, Newsreader body) */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Newsreader', Georgia, serif;
+  --font-ui:      'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* Ink · dark palette — blue slate after the Things theme: chrome darker than the page */
+  --bg-base:    #1c2127;
+  --bg-surface: #232930;
+  --bg-raised:  #181c20;
+  --bg-elev:    #2c313c;
+  --bg-active:  #6aa3f524;
+  --border:     #30363e;
+  --border-sub: #272c33;
+  --text-pri:   #d8dbdf;
+  --text-sec:   #a8b0b9;
+  --text-dim:   #66717d;
+  --accent:     #6aa3f5;
+  --accent-bg:  #6aa3f524;
+
+  /* Inline accents: italics, quotes and tags get their own hue so a page is not one gray mass;
+     bold stays neutral because notes lean on it for lead-ins. */
+  --c-em:    #f392b9;
+  --c-h4:    #e5b567;
+  --c-quote: #5ec4cc;
+  --c-tag:   #5ec4cc;
+
+  /* Caret: near the text color with a hint of accent. Visibility comes from luminance, not glow. */
+  --caret: color-mix(in srgb, var(--accent) 20%, var(--text-pri));
+
+  /* Semantic — dark (aesthetic-independent) */
+  --cal-warn:#d0a24a; --cal-warn-bg:#d0a24a14;
+  --cal-note:#9aa0a8; --cal-note-bg:#9aa0a812;
+  --cal-tip:#b58cff;  --cal-tip-bg:#b58cff16;
+  --cal-ok:#5fae6b;   --cal-ok-bg:#5fae6b14;
+  --cal-dang:#e0685f; --cal-dang-bg:#e0685f14;
+  --save-ok:    #6fae6b;
+  --raw-bg:     var(--bg-surface);
+  --raw-border: var(--accent);
+  --hl-key:     var(--text-pri);
+  --hl-string:  #9bbf72;
+  --hl-number:  #c9905a;
+  --hl-null:    #e0685f;
+  --hl-punct:   var(--text-sec);
+  --hl-keyword: #c792ea;
+}
+
+/* ── Light mode: luminance-only semantic tokens (shared by all aesthetics) ── */
+:is(#app, .theme-preview)[data-theme="light"] {
+  --cal-warn:#9a6a00; --cal-warn-bg:#f6e6b8;
+  --cal-note:#5b6169; --cal-note-bg:#e7e5df;
+  --cal-tip:#7a4fd0;  --cal-tip-bg:#ece2ff;
+  --cal-ok:#2f7d3c;   --cal-ok-bg:#d9f0dd;
+  --cal-dang:#c33b30; --cal-dang-bg:#f7e0dc;
+  --save-ok:    #2f7d3c;
+  --raw-bg:     var(--bg-surface);
+  --raw-border: var(--accent);
+  --hl-key:     var(--text-pri);
+  --hl-string:  #4f7a2e;
+  --hl-number:  #a2621f;
+  --hl-null:    #c33b30;
+  --hl-punct:   var(--text-sec);
+  --hl-keyword: #8a3fc7;
+
+  /* Ink · light — Obsidian's white page with gray chrome */
+  --c-em:    #c2457a;
+  --c-h4:    #a2741c;
+  --c-quote: #1d8790;
+  --c-tag:   #1d8790;
+
+  --bg-base:    #ffffff;
+  --bg-surface: #f5f6f8;
+  --bg-raised:  #f5f6f8;
+  --bg-elev:    #eaecef;
+  --bg-active:  #2563d41a;
+  --border:     #dfe1e5;
+  --border-sub: #eaecef;
+  --text-pri:   #202226;
+  --text-sec:   #5a5e65;
+  --text-dim:   #9ea2a8;
+  --accent:     #2563d4;
+  --accent-bg:  #2563d41a;
+  --caret: color-mix(in srgb, var(--accent) 30%, var(--text-pri));
+}
+
+/* ── Slate — IBM Plex superfamily, cool precise tool ── */
+:is(#app, .theme-preview)[data-aesthetic="slate"] {
+  --font-display: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body:    'IBM Plex Serif', Georgia, serif;
+  --font-ui:      'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+
+  --bg-base:    #0f1419;
+  --bg-surface: #161d25;
+  --bg-raised:  #131a21;
+  --bg-elev:    #1b232d;
+  --bg-active:  #3fb6a81f;
+  --border:     #273038;
+  --border-sub: #1c242c;
+  --text-pri:   #dce3ea;
+  --text-sec:   #93a2b1;
+  --text-dim:   #5c6975;
+  --accent:     #3fb6a8;
+  --accent-bg:  #3fb6a81c;
+  --hl-string:  #6fc8bb;
+  --hl-number:  #5b9bd4;
+  --hl-keyword: #7db4e0;
+}
+:is(#app, .theme-preview)[data-aesthetic="slate"][data-theme="light"] {
+  --bg-base:    #fbfcfd;
+  --bg-surface: #f1f4f7;
+  --bg-raised:  #ffffff;
+  --bg-elev:    #e7edf2;
+  --bg-active:  #148a7e1c;
+  --border:     #d5dde5;
+  --border-sub: #e7ecf1;
+  --text-pri:   #1a2028;
+  --text-sec:   #4c5b69;
+  --text-dim:   #8695a3;
+  --accent:     #148a7e;
+  --accent-bg:  #148a7e18;
+  --hl-string:  #237a6d;
+  --hl-number:  #2f6bb0;
+  --hl-keyword: #2f6bb0;
+}
+
+/* ── Sage — earthy, low-contrast, calm ── */
+:is(#app, .theme-preview)[data-aesthetic="sage"] {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Source Serif 4', Georgia, serif;
+  --font-ui:      'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --bg-base:    #141813;
+  --bg-surface: #1c211a;
+  --bg-raised:  #181d16;
+  --bg-elev:    #232921;
+  --bg-active:  #8ba36b1f;
+  --border:     #2f362a;
+  --border-sub: #232921;
+  --text-pri:   #dfe3d6;
+  --text-sec:   #9aa58c;
+  --text-dim:   #64705a;
+  --accent:     #8ba36b;
+  --accent-bg:  #8ba36b1c;
+  --hl-string:  #a3bd7e;
+  --hl-number:  #c08a55;
+  --hl-keyword: #b0764a;
+}
+:is(#app, .theme-preview)[data-aesthetic="sage"][data-theme="light"] {
+  --bg-base:    #f2f1e9;
+  --bg-surface: #e8e7db;
+  --bg-raised:  #f5f4ec;
+  --bg-elev:    #dfddcc;
+  --bg-active:  #6f85521c;
+  --border:     #d2cfba;
+  --border-sub: #e1dece;
+  --text-pri:   #2a2e24;
+  --text-sec:   #5f6853;
+  --text-dim:   #8f957f;
+  --accent:     #6f8552;
+  --accent-bg:  #6f855218;
+  --hl-string:  #566e37;
+  --hl-number:  #9a6a2f;
+  --hl-keyword: #8a5a35;
+}
+
+/* ── Theme-aware scrollbars ── */
+#app, #app * {
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+#app *::-webkit-scrollbar { width: 10px; height: 10px; }
+#app *::-webkit-scrollbar-track { background: transparent; }
+#app *::-webkit-scrollbar-thumb {
+  background: var(--border);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+#app *::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
+#app *::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Smooth cross-fade when switching aesthetic or light/dark ── */
+#app, #header, #left-sidebar, #tree-panel, #editor-col, #right-panel, #statusbar,
+.tree-item, .header-btn, #vault-switcher {
+  transition: background-color .28s ease, border-color .28s ease, color .18s ease;
+}

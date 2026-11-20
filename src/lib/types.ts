@@ -1,0 +1,25 @@
+export type FileNode = { path: string; type: 'file'; name: string } | { path: string; type: 'dir'; children: FileNode[]; folderNote?: string };
+export type Vault = { name: string; path: string; icon?: string };
+export type VaultsInfo = { vaults: Vault[]; active: string | null; default: string };
+export type SearchMode = 'all' | 'title' | 'content' | 'tags' | 'links';
+export type SearchResult = { path: string; match?: string; snippet?: string; tags?: string[]; direction?: string };
+export type RecentSort = 'modified' | 'created';
+export type RecentFile = { path: string; name: string; modified: number; created: number };
+export type LinksIndex = Record<string, { links_to: string[]; linked_from: string[] }>;
+export type Config = { vaults: Vault[]; default_vault: string | null; lang: string; theme_override: string | null; font_size: number };
+export type AppPreferences = { theme: 'light' | 'dark'; aesthetic: 'ink' | 'slate' | 'sage'; font_size: number; ui_font_size: number; persistent_live_preview: boolean };
+export type TasksSettings = { enabled: boolean; next_status_symbol: string; set_done_date: boolean; set_cancelled_date: boolean; set_created_date: boolean };
+export type PeriodicNotesSettings = { enabled: boolean; folder: string; format: string; template: string };
+export type RecentFilesSettings = { enabled: boolean; limit: number };
+export type ExcalidrawSettings = { enabled: boolean; embed_width: number };
+export type FolderNotesSettings = { enabled: boolean };
+export type FilesSettings = { attachment_folder: string };
+export type VaultPluginSettings = { files: FilesSettings; plugins: { tasks: TasksSettings; 'periodic-notes': PeriodicNotesSettings; 'recent-files': RecentFilesSettings; excalidraw: ExcalidrawSettings; 'folder-notes': FolderNotesSettings } };
+export type AppSettings = { preferences: AppPreferences; vault: string; vault_settings: VaultPluginSettings; settings_version: number };
+export type TaskLocation = { path: string; line: number; expected: string };
+export type TaskStatusType = 'TODO' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE' | 'CANCELLED' | 'NON_TASK';
+export type TaskRecord = { location: TaskLocation; status: { symbol: string; name: string; type: TaskStatusType }; description: string; heading: string; parent: number | null; indent: number; dates: Record<string, string>; priority: string | null; tags: string[]; recurrence: string | null; delete_when_done: boolean; block_id: string | null; groups?: string[] };
+export type TaskPatch = { status?: string; due?: string | null; scheduled?: string | null; start?: string | null; done?: string | null; cancelled?: string | null; created?: string | null; priority?: string | null };
+export type TaskQuery = { query: string };
+export type TaskQueryResult = { tasks: TaskRecord[]; errors: string[] };
+export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }

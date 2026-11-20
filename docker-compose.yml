@@ -1,0 +1,12 @@
+services:
+  telar-notes:
+    build: .
+    ports:
+      - "127.0.0.1:${TELAR_PORT:-7731}:7731"
+    volumes:
+      - "${VAULT_PATH:-./help}:/vault"
+      - telar-config:/root/.config/telar
+    restart: unless-stopped
+
+volumes:
+  telar-config:

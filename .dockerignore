@@ -1,0 +1,13 @@
+.git
+.venv
+node_modules
+web/dist
+__pycache__
+*.py[cod]
+*.log
+.DS_Store
+.pytest_cache
+.ruff_cache
+test-results
+CLAUDE.md
+AGENTS.md

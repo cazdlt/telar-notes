@@ -1,0 +1,81 @@
+/* ── Editor area & empty/raw states ── */
+#editor-area { flex: 1; overflow: hidden; }
+#editor-area[hidden] { display: none; }
+
+.empty-state {
+  height: 100%; display: grid; place-content: center; gap: 6px;
+  color: var(--text-dim); text-align: center;
+}
+/* Empty state: when two lines are present (wordmark + hint) the first becomes a
+   quiet display-font mark. `:not(:last-child)` keeps single-line states such as
+   "Loading…" at their plain size. */
+.empty-state > div:first-child:not(:last-child) {
+  font-family: var(--font-display); font-size: 2.6rem; font-weight: 600;
+  letter-spacing: -.025em; color: var(--text-sec); line-height: 1;
+}
+.empty-state > div:first-child:not(:last-child)::after {
+  content: ''; display: block; width: 44px; height: 2px; margin: 16px auto 4px;
+  background: var(--accent); border-radius: 2px; opacity: .85;
+}
+.empty-state > div:last-child:not(:first-child) { font-size: calc(13px * var(--ui-scale, 1)); color: var(--text-dim); }
+
+.raw-file { height: 100%; overflow: auto; padding: 24px 32px; }
+.raw-file img { display: block; max-width: min(100%, 900px); max-height: 100%; margin: auto; }
+.raw-file pre { white-space: pre-wrap; font-family: var(--font-mono); }
+.media-button { display: block; width: 100%; height: 100%; border: 0; background: transparent; cursor: zoom-in; }
+
+/* ── CodeMirror editor base ── */
+.cm-editor { height: 100%; font-family: var(--font-ui); font-size: var(--font-size); }
+.cm-editor.cm-focused { outline: none; }
+.cm-scroller { justify-content: center; container-type: inline-size; }
+#app .cm-content { padding: 16px var(--content-pad-x) 28px; }
+.cm-content { max-width: var(--content-width); margin: 0 auto; caret-color: var(--caret); font-family: var(--font-ui); }
+.cm-line { font-family: var(--font-ui); line-height: 1.7; color: var(--text-pri); }
+#app .cm-cursor, #app .cm-dropCursor { border-left: 2px solid var(--caret); }
+.cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--accent-bg) !important; }
+.cm-editor .cm-selectionLayer { z-index: 150 !important; pointer-events: none; }
+.cm-gutters { display: none; }
+
+/* Active line: raw monospace so the marks are editable */
+.cm-activeLine { background: var(--raw-bg); }
+.cm-activeLine, .cm-activeLine * { font-family: var(--font-mono) !important; }
+
+/* ── CodeMirror search panel ── */
+#app .cm-panels { border-color: var(--border); color: var(--text-pri); background: var(--bg-surface); }
+#app .cm-panels.cm-panels-top { border-bottom: 1px solid var(--border); }
+#app .cm-panels .cm-search { position: relative; display: grid; grid-template-columns: minmax(160px, 260px) repeat(6, max-content); justify-content: start; align-items: center; gap: 6px 8px; padding: 8px 44px 8px 12px; font: 13px var(--font-ui); }
+#app .cm-search br { display: none; }
+#app .cm-search .cm-textfield[name=replace] { grid-area: 2 / 1; }
+#app .cm-search .cm-button[name=replace] { grid-area: 2 / 2; }
+#app .cm-search .cm-button[name=replaceAll] { grid-area: 2 / 3; }
+#app .cm-search .cm-textfield { width: 100%; height: 28px; margin: 0; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; outline: none; color: var(--text-pri); background: var(--bg-elev); font: 13px var(--font-ui); }
+#app .cm-search .cm-textfield::placeholder { color: var(--text-dim); }
+#app .cm-search .cm-textfield:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+#app .cm-search .cm-button { height: 28px; margin: 0; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-sec); background: var(--bg-surface); background-image: none; font: 500 12px var(--font-ui); cursor: pointer; }
+#app .cm-search .cm-button:hover { color: var(--text-pri); border-color: var(--accent); }
+#app .cm-search .cm-button:active { background: var(--accent-bg); }
+#app .cm-search label { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border-radius: 6px; color: var(--text-sec); font-size: 12px; cursor: pointer; user-select: none; }
+#app .cm-search label:hover { color: var(--text-pri); background: var(--bg-elev); }
+#app .cm-search label:has(input:checked) { color: var(--accent); background: var(--accent-bg); }
+#app .cm-search input[type=checkbox] { margin: 0; accent-color: var(--accent); }
+#app .cm-search button[name=close] { position: absolute; top: 8px; right: 10px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; color: var(--text-dim); background: transparent; font-size: 18px; line-height: 1; cursor: pointer; }
+#app .cm-search button[name=close]:hover { color: var(--text-pri); background: var(--bg-elev); }
+#app .cm-searchMatch { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+#app .cm-searchMatch-selected { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+#app .cm-selectionMatch { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* ── Reading mode: single serif column without reveal ── */
+.reading #tree-panel, .reading #left-sidebar, .reading #right-panel, .reading #resize-handle { display: none; }
+.reading #editor-col { max-width: 960px; margin-inline: auto; }
+#app.reading { --content-width: 744px; }
+body.reading .cm-content, #app.reading .cm-content { font-family: var(--font-body); font-size: 1.15em; }
+#app.reading #md-format-buttons { visibility: hidden; }
+#app.reading #editor-toolbar { border-bottom-color: transparent; }
+body.reading .cm-line, #app.reading .cm-line { font-family: var(--font-body); line-height: 1.8; }
+body.reading .cm-h1, body.reading .cm-h2, body.reading .cm-h3, body.reading .cm-h4, body.reading .cm-h5, body.reading .cm-h6,
+#app.reading .cm-h1, #app.reading .cm-h2, #app.reading .cm-h3, #app.reading .cm-h4, #app.reading .cm-h5, #app.reading .cm-h6 { font-family: var(--font-display); }
+body.reading .cm-code, body.reading .cm-codeblock, body.reading .cm-cb-open::before,
+#app.reading .cm-code, #app.reading .cm-codeblock, #app.reading .cm-cb-open::before { font-family: var(--font-mono); }
+body.reading .cm-cb-open::before, #app.reading .cm-cb-open::before { font-family: var(--font-ui); }
+#reading-toggle.active { color: var(--accent); border-color: var(--accent); }
+#app.reading #explorer-scrim { display: none; }

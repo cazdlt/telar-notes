@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.DS_Store
+web/dist/
+*.log
+.pytest_cache/
+.ruff_cache/
+test-results/
+playwright-report/
+
+help/links-index.json
+help/.trash/
+CLAUDE.md
+AGENTS.md
