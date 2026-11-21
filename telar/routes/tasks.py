@@ -13,6 +13,7 @@ from telar.deps import AppState, api_error, get_state, get_vault, read_json_body
 from telar.task_query import query_tasks
 from telar.tasks import (
     TaskLocationError,
+    add_task_line,
     ensure_task_block_id,
     parse_tasks,
     update_task_line,
@@ -54,6 +55,21 @@ def get_task_block(
     return JSONResponse({"task": task})
 
 
+@router.post("/api/tasks/add")
+def post_tasks_add(
+    body: dict[str, Any] = Depends(read_json_body),
+    vault: pathlib.Path = Depends(get_vault),
+) -> Response:
+    """Format and insert a new task line into an existing note."""
+    try:
+        result = add_task_line(vault, body)
+    except TaskLocationError as error:
+        return api_error(error.status, str(error))
+    except ValueError as error:
+        return api_error(400, str(error))
+    return JSONResponse(result)
+
+
 @router.post("/api/tasks/update")
 def post_tasks_update(
     body: dict[str, Any] = Depends(read_json_body),
@@ -65,8 +81,9 @@ def post_tasks_update(
     if not isinstance(patch, dict):
         return api_error(400, "location and patch required")
     settings = vault_settings(state.config.load(), vault)["plugins"]["tasks"]
+    dry_run = bool(body.get("dry_run", False))
     try:
-        result = update_task_line(vault, location, patch, settings)
+        result = update_task_line(vault, location, patch, settings, dry_run=dry_run)
     except TaskLocationError as error:
         return api_error(error.status, str(error))
     except ValueError as error:
