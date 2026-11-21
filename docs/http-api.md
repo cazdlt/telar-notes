@@ -17,7 +17,8 @@ This is the minimum contract that must survive frontend migration. It does not f
 |---|---|---|
 | `GET /api/files` | None | `{ "tree": FileNode[] }` |
 | `GET /api/files/recent?sort=...&limit=...` | `sort`: `modified` (default) or `created`; `limit`: integer, default 50, clamped to 1-500 | `{ "files": RecentFile[] }`, newest first |
-| `GET /api/note?path=...` | Text file; optional `If-None-Match` | `{ "path": string, "content": string, "revision": string }` with `ETag` (`304` when unchanged) |
+| `GET /api/note?path=...` | Text file; optional `If-None-Match`; optional `section=...` OR `start_line=...&end_line=...` (mutually exclusive) | `{ "path": string, "content": string, "revision": string }` with `ETag` (`304` when unchanged); with `section` also includes `section`, `start_line`, `end_line` (`404` missing, `409` ambiguous); with line range includes `start_line`, `end_line` |
+| `GET /api/note/outline?path=...` | Text file | `{ "path": string, "revision": string, "headings": [{ "level": int, "text": string, "line": int, "end_line": int }] }` (ignores frontmatter and fenced code blocks) |
 | `GET /api/raw?path=...` | File | Bytes with detected `Content-Type` |
 | `GET /api/links?vault=...` | Optional vault; `__all__` merges all | Map from path to `links_to` and `linked_from` |
 | `GET /api/config` | None | Effective configuration |
@@ -38,7 +39,9 @@ A task's Obsidian block ID (` ^id`, last on the line as Tasks requires) is expos
 | Method and path | JSON body | Effect and successful response |
 |---|---|---|
 | `POST /api/note` | `{ "path", "content", "base_revision"?, "force"? }` | Create or replace a note; `{ "ok": true, "revision" }`. `base_revision: null` (or omitted) means create-only: `409` if the file exists. A string `base_revision` must match the current revision, otherwise `409` `{ "error", "revision", "content" }` with the on-disk state; a missing file with a string `base_revision` returns `409` `{ "error": "note was removed" }`. `force: true` skips the revision check |
-| `POST /api/tasks/update` | `{ "location": TaskLocation, "patch": TaskPatch }` | Update a task's status, dates, or priority; `{ "ok": true, "revision" }`. A stale `location` returns `409` |
+| `POST /api/note/patch` | `{ "path", "op": "insert" \| "replace_section" \| "replace_text", "base_revision"?, "dry_run"?, ... }` | Surgically edit a note atomically (`insert` at `after_heading`/`end_of_section`/`before_heading`/`end_of_file`/`start_of_file`, `replace_section` by `heading`, or unique `replace_text` with `old`/`new`); `{ "ok": true, "revision", "diff", "dry_run"? }`. Updates links and invalidates task cache unless `dry_run: true` |
+| `POST /api/tasks/add` | `{ "path", "description", "status"?, "priority"?, "dates"?, "tags"?, "block_id"?, "children"?, "anchor"?, "heading"?, "dry_run"? }` | Format and insert a canonical Obsidian Tasks line (with optional indented child lines and unique `^block_id`); `{ "ok": true, "task", "embed", "revision", "diff", "dry_run"? }`. Duplicate `block_id` returns `409` |
+| `POST /api/tasks/update` | `{ "location": TaskLocation, "patch": TaskPatch, "dry_run"? }` | Update a task's status, dates, priority (emoji or name), `description`, `block_id`, or `append_children`; `{ "ok": true, "revision", "old_status", "diff", "dry_run"? }`. `location` accepts `{ "path", "line", "expected" }`, `{ "path", "block_id" }`, `{ "path", "match" }`, or `{ "path", "line" }`; stale or ambiguous locations return `409` |
 | `POST /api/tasks/block-id` | `{ "location": TaskLocation }` | Append a readable, file-unique `^id` to the task line if it has none; `{ "ok": true, "id", "revision" }`. A stale `location` returns `409` |
 | `POST /api/periodic/today` | `{ "date"? }` (optional ISO date) | Open or create today's daily note from the Periodic Notes template; `{ "path", "created", "content", "revision" }` |
 | `POST /api/settings` | `{ "preferences", "vault_settings" }` | Validate and persist preferences and active vault settings; `{ "preferences", "vault_settings" }` |
