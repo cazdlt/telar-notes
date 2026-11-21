@@ -25,6 +25,6 @@ export const periodicNotesPlugin = registerPlugin<PeriodicNotesSettings>({
 });
 
 export const folderNotesPlugin = registerPlugin<FolderNotesSettings>({
-  id: 'folder-notes', name: 'Folder Notes', defaults: { enabled: false }, enabled: (settings) => settings.enabled,
+  id: 'folder-notes', name: 'Folder Notes', defaults: { enabled: true }, enabled: (settings) => settings.enabled,
   fields: [{ key: 'enabled', label: 'Enabled', type: 'boolean' }],
 });

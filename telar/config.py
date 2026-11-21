@@ -58,7 +58,7 @@ DEFAULT_PERIODIC_SETTINGS: dict[str, Any] = {
 }
 DEFAULT_RECENT_FILES_SETTINGS: dict[str, Any] = {"enabled": True, "limit": 20}
 DEFAULT_EXCALIDRAW_SETTINGS: dict[str, Any] = {"enabled": True, "embed_width": 400}
-DEFAULT_FOLDER_NOTES_SETTINGS: dict[str, Any] = {"enabled": False}
+DEFAULT_FOLDER_NOTES_SETTINGS: dict[str, Any] = {"enabled": True}
 DEFAULT_FILES_SETTINGS: dict[str, Any] = {
     "attachment_folder": "/"
 }  # Obsidian's default: vault root

@@ -42,9 +42,9 @@ def test_config_round_trip_and_active_vault_selection(tmp_path):
 
 def test_folder_notes_plugin_setting_defaults_and_validates(api):
     _, settings = api.request("GET", "/api/settings")
-    assert settings["vault_settings"]["plugins"]["folder-notes"] == {"enabled": False}
+    assert settings["vault_settings"]["plugins"]["folder-notes"] == {"enabled": True}
     plugins = {**settings["vault_settings"]["plugins"]}
-    for value, expected in ((True, True), ("on", False)):
+    for value, expected in ((False, False), ("on", True)):
         plugins["folder-notes"] = {"enabled": value}
         _, saved = api.request(
             "POST",

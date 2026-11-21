@@ -104,7 +104,7 @@
   let pathCopiedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const fileSet = $derived(flattenFiles(appState.tree));
-  const folderNotesEnabled = $derived(settings?.vault_settings.plugins['folder-notes']?.enabled ?? false);
+  const folderNotesEnabled = $derived(settings?.vault_settings.plugins['folder-notes']?.enabled ?? true);
   const treeNodes = $derived(folderNotesEnabled ? withFolderNotes(appState.tree) : appState.tree);
   const recentSettings = $derived(settings?.vault_settings.plugins['recent-files']);
   const recentEnabled = $derived(recentSettings?.enabled ?? true);
@@ -836,6 +836,22 @@
 
   $effect(() => {
     if (recentVisible && recentTab !== 'opened') void refreshRecent();
+  });
+
+  $effect(() => {
+    void theme;
+    void aesthetic;
+    const appEl = document.getElementById('app');
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!appEl || !link) return;
+    const style = getComputedStyle(appEl);
+    const bg = style.getPropertyValue('--bg-elev').trim();
+    const border = style.getPropertyValue('--border').trim();
+    const warp = style.getPropertyValue('--text-pri').trim();
+    const weft = style.getPropertyValue('--accent').trim();
+    if (!bg || !warp || !weft) return;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="${bg}" stroke="${border}" stroke-width="1"/><path d="M9.5 6V12.3M9.5 19.7V26M16 6V26M22.5 6V12.3M22.5 19.7V26" fill="none" stroke="${warp}" stroke-width="2.6" stroke-linecap="round"/><path d="M5.5 16H12.3M19.7 16H26.5" fill="none" stroke="${weft}" stroke-width="2.9" stroke-linecap="round"/></svg>`;
+    link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
   });
 
   onMount(async () => {

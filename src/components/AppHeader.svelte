@@ -37,11 +37,9 @@
   </div>
   <button id="vault-switcher" type="button" title="Manage vaults" onclick={onOpenSettings}>
     <svg class="app-mark" viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="#1e1e1e"/>
-      <g transform="translate(0 1)">
-        <path d="M9 6.5H23v5.6h-1.3q-.6-2.6-3.2-2.6h-3v3.7h2.4q1.4 0 1.6-1.5h1.3v5.6h-1.3q-.2-1.5-1.6-1.5h-2.4v4.1q0 .8 1 1l1.5.2v1.1H9v-1.1l1.3-.2q1-.2 1-1V9.1q0-.8-1-1L9 7.9z" fill="#dadada"/>
-        <rect x="9" y="24" width="14" height="2.4" rx="1.2" fill="#8a5cf5"/>
-      </g>
+      <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="var(--bg-elev)" stroke="var(--border)" stroke-width="1"/>
+      <path d="M9.5 6V12.3M9.5 19.7V26M16 6V26M22.5 6V12.3M22.5 19.7V26" fill="none" stroke="var(--text-pri)" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M5.5 16H12.3M19.7 16H26.5" fill="none" stroke="var(--accent)" stroke-width="2.9" stroke-linecap="round"/>
     </svg>{activeVault ?? 'No vault'}
   </button>
   <div id="header-spacer"></div>

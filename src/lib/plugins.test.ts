@@ -23,8 +23,9 @@ describe('built-in plugins', () => {
     });
     expect(periodicNotesPlugin.enabled(periodicNotesPlugin.defaults)).toBe(true);
 
-    expect(folderNotesPlugin.defaults.enabled).toBe(false);
-    expect(folderNotesPlugin.enabled(folderNotesPlugin.defaults)).toBe(false);
+    expect(folderNotesPlugin.defaults.enabled).toBe(true);
+    expect(folderNotesPlugin.enabled(folderNotesPlugin.defaults)).toBe(true);
+    expect(folderNotesPlugin.enabled({ ...folderNotesPlugin.defaults, enabled: false })).toBe(false);
   });
 
   it('defines settings fields matching each plugin defaults keys', () => {
