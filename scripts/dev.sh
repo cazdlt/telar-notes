@@ -7,7 +7,7 @@ vault="${1:-${TELAR_VAULT:-${project_dir}/help}}"
 port="${2:-${TELAR_PORT:-7731}}"
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  printf 'Usage: scripts/dev [vault] [port]\n'
+  printf 'Usage: scripts/dev.sh [vault] [port]\n'
   exit 0
 fi
 if [[ ! -d "${vault}" ]]; then
@@ -27,6 +27,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+cd "${project_dir}"
 uv run --project "${project_dir}" python "${project_dir}/server.py" --vault "$(cd -- "${vault}" && pwd)" --port "${api_port}" --idle-timeout 0 &
 api_pid=$!
 TELAR_API_PORT="${api_port}" npm run dev -- --host 127.0.0.1 --port "${port}" &

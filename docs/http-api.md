@@ -4,7 +4,7 @@ This is the minimum contract that must survive frontend migration. It does not f
 
 ## Common rules
 
-- The server listens only on loopback and accepts `Host` and `Origin` values for `localhost` or `127.0.0.1`.
+- The server listens on loopback by default (or `0.0.0.0` in Docker) and accepts `Host` and `Origin` values for `localhost`, `127.0.0.1`, and any hosts configured in `TELAR_ALLOWED_HOSTS`.
 - File paths are relative to the active vault and cannot escape it.
 - An optional `X-Vault: <name>` header scopes that request to a registered vault without changing the session vault. The client sends it from windows opened with `?vault=<name>`; unknown names fall back to the session vault.
 - API responses are JSON except `/api/raw` and static assets.
@@ -17,12 +17,14 @@ This is the minimum contract that must survive frontend migration. It does not f
 |---|---|---|
 | `GET /api/files` | None | `{ "tree": FileNode[] }` |
 | `GET /api/files/recent?sort=...&limit=...` | `sort`: `modified` (default) or `created`; `limit`: integer, default 50, clamped to 1-500 | `{ "files": RecentFile[] }`, newest first |
-| `GET /api/note?path=...` | Text file | `{ "path": string, "content": string }` |
+| `GET /api/note?path=...` | Text file; optional `If-None-Match` | `{ "path": string, "content": string, "revision": string }` with `ETag` (`304` when unchanged) |
 | `GET /api/raw?path=...` | File | Bytes with detected `Content-Type` |
 | `GET /api/links?vault=...` | Optional vault; `__all__` merges all | Map from path to `links_to` and `linked_from` |
 | `GET /api/config` | None | Effective configuration |
+| `GET /api/settings` | None | `{ "preferences", "vault_settings" }` for the active vault |
 | `GET /api/vaults` | None | `VaultsInfo`: `{ "vaults": Vault[], "active": string | null, "default": string }` |
 | `GET /api/search?q=...&mode=...` | `all`, `title`, `content`, `tags`, or `links` | `{ "results": SearchResult[] }` |
+| `GET /api/tasks?query=...&source=...` | Optional Tasks query and source note path | Task query result for the active vault |
 | `GET /api/tasks/block?path=...&id=...` | Note path and block ID | `{ "task": TaskRecord }` for the task line ending in `^id`; `404` when absent |
 
 A task's Obsidian block ID (` ^id`, last on the line as Tasks requires) is exposed as `TaskRecord.block_id` and kept last when `POST /api/tasks/update` adds dates or priority. The editor renders `![[Note#^id]]` as the referenced task.
@@ -36,7 +38,11 @@ A task's Obsidian block ID (` ^id`, last on the line as Tasks requires) is expos
 | Method and path | JSON body | Effect and successful response |
 |---|---|---|
 | `POST /api/note` | `{ "path", "content", "base_revision"?, "force"? }` | Create or replace a note; `{ "ok": true, "revision" }`. `base_revision: null` (or omitted) means create-only: `409` if the file exists. A string `base_revision` must match the current revision, otherwise `409` `{ "error", "revision", "content" }` with the on-disk state; a missing file with a string `base_revision` returns `409` `{ "error": "note was removed" }`. `force: true` skips the revision check |
+| `POST /api/tasks/update` | `{ "location": TaskLocation, "patch": TaskPatch }` | Update a task's status, dates, or priority; `{ "ok": true, "revision" }`. A stale `location` returns `409` |
 | `POST /api/tasks/block-id` | `{ "location": TaskLocation }` | Append a readable, file-unique `^id` to the task line if it has none; `{ "ok": true, "id", "revision" }`. A stale `location` returns `409` |
+| `POST /api/periodic/today` | `{ "date"? }` (optional ISO date) | Open or create today's daily note from the Periodic Notes template; `{ "path", "created", "content", "revision" }` |
+| `POST /api/settings` | `{ "preferences", "vault_settings" }` | Validate and persist preferences and active vault settings; `{ "preferences", "vault_settings" }` |
+| `POST /api/settings/import-obsidian` | None | Import supported plugin and attachment settings from `.obsidian/`; `{ "preferences", "vault_settings" }` |
 | `POST /api/links/rebuild` | None | Rebuild `links-index.json` from disk for the active vault; same body as `GET /api/links` |
 | `POST /api/session/vault` | `{ "vault" }` | Switch the session vault; `{ "ok": true, "active_vault" }` |
 | `POST /api/vaults/pick` | `{}` | Open the native macOS folder dialog; `{ "path" }` or `{ "cancelled": true }` |
@@ -71,6 +77,5 @@ A task's Obsidian block ID (` ^id`, last on the line as Tasks requires) is expos
 
 ## Contracts allowed to evolve
 
-- Tag search is not committed for Milestone 1.
 - The tree payload may become an incremental update stream.
 - The API must be versioned before plugins consume it.

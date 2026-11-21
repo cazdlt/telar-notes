@@ -861,14 +861,23 @@
       const initial = new URLSearchParams(location.search).get('open');
       if (initial) await openFile(initial);
     } catch (cause) { error = friendlyError(cause, 'Could not load vault.'); }
-    poll = setInterval(() => { void refreshTree().catch(() => undefined); void refreshRecent(); void pollOpenNote(); }, 2000);
+    poll = setInterval(syncFromDisk, 2000);
+    document.addEventListener('visibilitychange', syncFromDisk);
     window.addEventListener('keydown', globalKey);
     document.addEventListener('click', closeContext);
   });
 
+  function syncFromDisk(): void {
+    if (document.hidden) return;
+    void refreshTree().catch(() => undefined);
+    void refreshRecent();
+    void pollOpenNote();
+  }
+
   onDestroy(() => {
     if (poll) clearInterval(poll);
     clearTimeout(searchTimer);
+    document.removeEventListener('visibilitychange', syncFromDisk);
     window.removeEventListener('keydown', globalKey);
     document.removeEventListener('click', closeContext);
   });

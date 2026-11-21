@@ -32,7 +32,7 @@ The frontend loads interface fonts at runtime from Google Fonts (`fonts.googleap
 Start the development server against a vault:
 
 ```bash
-scripts/dev /path/to/your-vault
+scripts/dev.sh /path/to/your-vault
 ```
 
 Then open <http://127.0.0.1:7731>.
@@ -40,7 +40,7 @@ Then open <http://127.0.0.1:7731>.
 You can pass a custom port as the second argument or use environment variables:
 
 ```bash
-TELAR_VAULT=/path/to/your-vault TELAR_PORT=8000 scripts/dev
+TELAR_VAULT=/path/to/your-vault TELAR_PORT=8000 scripts/dev.sh
 ```
 
 To run the production build directly:
@@ -103,17 +103,17 @@ The `--vault` argument acts as a fallback when no vault is configured.
 - `server.py`: Python CLI runner and backward-compatible entrypoint
 - `src/`: Svelte 5 + TypeScript frontend
 - `excalidraw-editor.html`, `src/excalidraw/`: isolated Excalidraw iframe
-- `scripts/dev`: development server launcher
+- `scripts/dev.sh`: development server launcher
 - `scripts/deploy.sh`, `scripts/upgrade.sh`: Docker deployment and upgrade helpers
 - `tests/python/`: HTTP API and backend tests (frontend tests live beside source as `src/**/*.test.ts`)
-- `benchmarks/`: performance baseline scripts
+- `docs/`: HTTP API contract and task reference documentation
 
 ## Quality checks
 
 ```bash
-uv run ruff format --check telar server.py tests/python benchmarks/baseline.py
-uv run ruff check telar server.py tests/python benchmarks/baseline.py
-uv run ty check telar server.py tests/python benchmarks/baseline.py
+uv run ruff format --check telar server.py tests/python
+uv run ruff check telar server.py tests/python
+uv run ty check telar server.py tests/python
 uv run pytest
 npm install
 npm run check
