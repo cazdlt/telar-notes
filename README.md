@@ -68,6 +68,13 @@ Environment variables:
 - `TELAR_UID` / `TELAR_GID`: Host user and group IDs the container runs as (defaults to `1000:1000`). Match your host or Syncthing user so atomic writes (`0600`) remain owned by the right user.
 - `TELAR_ALLOWED_HOSTS`: Optional comma-separated hostnames allowed in `Host` / `Origin` headers (empty by default). Set this only when fronting Telar with a private reverse proxy/VPN (such as Tailscale + Caddy), as Telar has no built-in authentication and must never be exposed to the public internet.
 
+For repeatable server deployments, copy `.env.example` to `.env`, set `VAULT_PATH` (and any other variables), then run:
+
+```bash
+./scripts/deploy.sh   # initial start / rebuild using .env
+./scripts/upgrade.sh  # git pull --ff-only + deploy.sh
+```
+
 ## Configuration
 
 Configuration is stored at `~/.config/telar/config.json` (or `$XDG_CONFIG_HOME/telar/config.json` if `XDG_CONFIG_HOME` is set), and per-vault link indexes are stored under `$XDG_CONFIG_HOME/telar/indexes/` (not inside the vault). To configure multiple vaults:
@@ -97,6 +104,7 @@ The `--vault` argument acts as a fallback when no vault is configured.
 - `src/`: Svelte 5 + TypeScript frontend
 - `excalidraw-editor.html`, `src/excalidraw/`: isolated Excalidraw iframe
 - `scripts/dev`: development server launcher
+- `scripts/deploy.sh`, `scripts/upgrade.sh`: Docker deployment and upgrade helpers
 - `tests/python/`: HTTP API and backend tests (frontend tests live beside source as `src/**/*.test.ts`)
 - `benchmarks/`: performance baseline scripts
 
