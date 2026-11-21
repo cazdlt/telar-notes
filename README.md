@@ -2,7 +2,7 @@
 
 A local-first web editor for Markdown vaults, built with a Python backend and a Svelte 5 + TypeScript frontend.
 
-> **Local use only:** Telar Notes is designed strictly for single-user local use. The server binds to `127.0.0.1`, has no authentication or multi-user isolation, and reads/writes directly to your local filesystem. **Do not** expose it to the internet or deploy it as a public web service.
+> **Local and private self-hosted use only:** Telar Notes is designed for single-user use, either locally on `127.0.0.1` or self-hosted behind a private VPN/reverse proxy (e.g. Tailscale + Caddy, ideally inside Docker with `TELAR_ALLOWED_HOSTS`). It has no built-in authentication or multi-user isolation and reads/writes directly to the filesystem. **Do not** expose it to the public internet.
 
 ## Features
 
