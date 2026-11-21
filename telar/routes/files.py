@@ -16,6 +16,13 @@ from fastapi.responses import JSONResponse
 from telar.config import atomic_write_text, vault_settings
 from telar.deps import AppState, api_error, get_state, get_vault, read_json_body
 from telar.links import update_links_index
+from telar.sections import (
+    SectionError,
+    parse_outline,
+    patch_note,
+    read_lines,
+    read_section,
+)
 from telar.tasks import invalidate_tasks, parse_iso_date
 from telar.vault import (
     RECENT_LIMIT_MAX,
@@ -56,14 +63,11 @@ def get_recent_files(
     return JSONResponse({"files": recent_files(vault, sort, clamped)})
 
 
-@router.get("/api/note")
-def get_note(
-    request: Request,
-    path: str | None = None,
-    vault: pathlib.Path = Depends(get_vault),
-) -> Response:
-    """Read a UTF-8 note with ETag / If-None-Match support."""
-    if not path:
+def _read_existing_note(
+    vault: pathlib.Path, path: str | None
+) -> tuple[pathlib.Path, str] | Response:
+    """Validate a vault-relative note path and return ``(target, text)`` or an error."""
+    if not path or not isinstance(path, str):
         return api_error(400, "path required")
     try:
         target = resolve_vault_path(vault, path)
@@ -72,16 +76,94 @@ def get_note(
     if not target.exists() or not target.is_file():
         return api_error(404, "not found")
     try:
-        content = target.read_text()
+        return target, target.read_text()
     except UnicodeDecodeError:
         return api_error(415, "not a text file")
+
+
+@router.get("/api/note/outline")
+def get_note_outline(
+    path: str | None = None,
+    vault: pathlib.Path = Depends(get_vault),
+) -> Response:
+    """Return the Markdown heading outline and current revision for a note."""
+    loaded = _read_existing_note(vault, path)
+    if isinstance(loaded, Response):
+        return loaded
+    _, content = loaded
     rev = revision(content)
-    if request.headers.get("If-None-Match") == rev:
-        return Response(status_code=304, headers={"ETag": rev})
     return JSONResponse(
-        {"path": path, "content": content, "revision": rev},
+        {"path": path, "revision": rev, "headings": parse_outline(content)},
         headers={"ETag": rev},
     )
+
+
+@router.get("/api/note")
+def get_note(
+    request: Request,
+    path: str | None = None,
+    section: str | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
+    vault: pathlib.Path = Depends(get_vault),
+) -> Response:
+    """Read a UTF-8 note (full, by section, or by line range) with ETag support."""
+    if section is not None and (start_line is not None or end_line is not None):
+        return api_error(400, "cannot combine section with start_line or end_line")
+    loaded = _read_existing_note(vault, path)
+    if isinstance(loaded, Response):
+        return loaded
+    _, content = loaded
+    rev = revision(content)
+    if section is None and start_line is None and end_line is None:
+        if request.headers.get("If-None-Match") == rev:
+            return Response(status_code=304, headers={"ETag": rev})
+        return JSONResponse(
+            {"path": path, "content": content, "revision": rev},
+            headers={"ETag": rev},
+        )
+    try:
+        slice_payload = (
+            read_section(content, section)
+            if section is not None
+            else read_lines(content, start_line, end_line)
+        )
+    except SectionError as error:
+        return api_error(error.status, error.message, **error.extra)
+    return JSONResponse(
+        {"path": path, "revision": rev, **slice_payload},
+        headers={"ETag": rev},
+    )
+
+
+@router.post("/api/note/patch")
+def post_note_patch(
+    body: dict[str, Any] = Depends(read_json_body),
+    vault: pathlib.Path = Depends(get_vault),
+) -> Response:
+    """Apply a surgical patch to an existing note with optional concurrency check."""
+    rel = body.get("path")
+    loaded = _read_existing_note(vault, rel if isinstance(rel, str) else None)
+    if isinstance(loaded, Response):
+        return loaded
+    assert isinstance(rel, str)
+    target, content = loaded
+    current_rev = revision(content)
+    base_revision = body.get("base_revision")
+    if base_revision is not None and base_revision != current_rev:
+        return api_error(409, "note changed on disk", revision=current_rev)
+    try:
+        new_content, diff = patch_note(content, rel, body)
+    except SectionError as error:
+        return api_error(error.status, error.message, **error.extra)
+    if body.get("dry_run") is True:
+        return JSONResponse(
+            {"ok": True, "dry_run": True, "revision": current_rev, "diff": diff}
+        )
+    atomic_write_text(target, new_content)
+    update_links_index(vault, rel, new_content)
+    invalidate_tasks(vault, rel)
+    return JSONResponse({"ok": True, "revision": revision(new_content), "diff": diff})
 
 
 @router.get("/api/raw")
