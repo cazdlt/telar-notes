@@ -2,7 +2,6 @@ FROM node:24-slim AS frontend
 WORKDIR /app
 
 COPY package.json package-lock.json tsconfig.json vite.config.ts index.html excalidraw-editor.html ./
-COPY public ./public
 COPY src ./src
 
 RUN npm ci && npm run build
