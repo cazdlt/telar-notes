@@ -78,6 +78,10 @@ A task's Obsidian block ID (` ^id`, last on the line as Tasks requires) is expos
 - Static files are served only from the frontend build: `/`, `/excalidraw-editor.html`, and `/assets/*` with allowed extensions.
 - `POST /api/reveal` remains a macOS-specific integration with vault path validation.
 
+## MCP endpoint
+
+Telar Notes also mounts a stateless Streamable HTTP MCP server at `/mcp` (`telar/mcp_server.py`) under the same `Host` / `Origin` (`TELAR_ALLOWED_HOSTS`) and vault path boundaries. See [docs/mcp.md](./mcp.md) for client configuration, multi-vault resolution (`vault` argument and `X-Vault` header), and the full tool reference.
+
 ## Contracts allowed to evolve
 
 - The tree payload may become an incremental update stream.

@@ -6,13 +6,16 @@ import os
 import pathlib
 import time
 import urllib.parse
-from typing import Awaitable, Callable, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from telar.config import TelarConfig
 from telar.deps import AppState, api_error
+from telar.mcp_server import create_mcp_server
 from telar.routes import files, links, search, settings, static, tasks
 
 MAX_BODY_BYTES = 50 * 1024 * 1024
@@ -39,14 +42,37 @@ def create_app(
 ) -> FastAPI:
     """Create and configure the Telar Notes FastAPI application."""
     allowed = _parse_allowed_hosts(allowed_hosts)
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     tracker = activity if activity is not None else {"t": time.time()}
-    app.state.telar = AppState(
+    state = AppState(
         fallback_vault=pathlib.Path(vault_path),
         config=config,
         session_path=session_path,
         activity=tracker,
     )
+    mcp_server = create_mcp_server(state)
+    # Telar's own boundary middleware enforces Host/Origin against TELAR_ALLOWED_HOSTS.
+    mcp_subapp = mcp_server.streamable_http_app(
+        streamable_http_path="/mcp",
+        stateless_http=True,
+        json_response=True,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        ),
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        async with mcp_server.session_manager.run():
+            yield
+
+    app = FastAPI(
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
+    app.state.telar = state
+    app.state.mcp = mcp_server
 
     @app.middleware("http")
     async def boundary_and_limits(
@@ -91,4 +117,5 @@ def create_app(
     app.include_router(search.router)
     app.include_router(settings.router)
     app.include_router(static.router)
+    app.router.routes.extend(mcp_subapp.routes)
     return app

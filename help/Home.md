@@ -9,4 +9,5 @@ This folder is a regular vault. Everything here is plain Markdown, so you can re
 - [[Daily notes]]: today's note and the calendar
 - [[Drawings]]: Excalidraw files
 - [[Vaults and settings]]
+- [[MCP and AI clients]]: connect AI assistants via `/mcp`
 - [[Shortcuts]]

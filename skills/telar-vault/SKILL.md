@@ -7,6 +7,8 @@ description: Read, search, create, and surgically edit Markdown notes and Obsidi
 
 Interact with any Telar Notes vault over HTTP using `scripts/telar_cli.py` (Python 3 stdlib only; no external packages required).
 
+> **Tip:** If your client supports Streamable HTTP MCP, Telar Notes also exposes a built-in MCP server at `/mcp` (zero client-side installation — see `docs/mcp.md`). Use this skill when working in shell-driven environments without MCP or when scripting from the terminal.
+
 ## Configuration
 
 Set connection environment variables or pass global flags before the subcommand:
