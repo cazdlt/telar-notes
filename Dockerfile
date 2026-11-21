@@ -1,10 +1,12 @@
 FROM node:24-slim AS frontend
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.json vite.config.ts index.html excalidraw-editor.html ./
-COPY src ./src
+COPY package.json package-lock.json ./
+RUN npm ci
 
-RUN npm ci && npm run build
+COPY tsconfig.json vite.config.ts index.html excalidraw-editor.html ./
+COPY src ./src
+RUN npm run build
 
 FROM python:3.14-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
