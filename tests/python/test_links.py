@@ -1,8 +1,8 @@
-"""Tests for wikilinks, backlinks, links-index.json, and link resolution."""
+"""Tests for wikilinks, backlinks, link index storage, and link resolution."""
 
 import json
 
-from telar.links import build_links_index
+from telar.links import build_links_index, links_index_path
 
 
 def test_links_and_backlinks_are_symmetric(api):
@@ -10,7 +10,8 @@ def test_links_and_backlinks_are_symmetric(api):
     assert status == 200
     assert "project.md" in index["daily/today.md"]["links_to"]
     assert "daily/today.md" in index["project.md"]["linked_from"]
-    assert (api.work / "links-index.json").exists()
+    assert links_index_path(api.work).exists()
+    assert not (api.work / "links-index.json").exists()
 
 
 def test_links_rebuild_picks_up_external_edits(api):
@@ -25,6 +26,7 @@ def test_links_rebuild_picks_up_external_edits(api):
     assert status == 200
     assert index["daily/today.md"]["links_to"] == []
     assert "daily/today.md" not in index["project.md"]["linked_from"]
+    assert not (api.work / "links-index.json").exists()
     status, again = api.request("GET", "/api/links")
     assert again == index
 
@@ -33,7 +35,9 @@ def test_hidden_folders_are_not_indexed_or_searched(api):
     for rel in (".trash/old.md", ".venv/pkg/README.md"):
         (api.work / rel).parent.mkdir(parents=True, exist_ok=True)
         (api.work / rel).write_text("hiddenword [[project]]")
-    (api.work / "links-index.json").write_text(
+    idx_path = links_index_path(api.work)
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+    idx_path.write_text(
         json.dumps({".trash/old.md": {"links_to": ["project.md"], "linked_from": []}})
     )
 
@@ -90,7 +94,7 @@ def test_links_resolve_equivalent_unicode_compositions(api):
     assert index[resolved]["linked_from"] == ["daily/today.md"]
 
     (people / "team.md").write_text("# Team\n[[Omar Castaño]]\n")
-    (api.work / "links-index.json").unlink()
+    links_index_path(api.work).unlink()
     status, index = api.request("GET", "/api/links")
 
     assert status == 200
@@ -105,7 +109,9 @@ def test_stale_unicode_alias_in_links_cache_is_rebuilt(api):
     actual = f"teams/people/{decomposed}"
     (people / decomposed).write_text("# Pablo García\n")
     (api.work / "daily" / "today.md").write_text("# Today\n[[Pablo García]]\n")
-    (api.work / "links-index.json").write_text(
+    idx_path = links_index_path(api.work)
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+    idx_path.write_text(
         json.dumps(
             {
                 "daily/today.md": {
@@ -130,7 +136,9 @@ def test_stale_unicode_alias_in_links_cache_is_rebuilt(api):
 
 
 def test_partial_links_cache_is_rebuilt(api):
-    (api.work / "links-index.json").write_text(
+    idx_path = links_index_path(api.work)
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+    idx_path.write_text(
         json.dumps({"daily/today.md": {"links_to": [], "linked_from": []}})
     )
 
@@ -154,6 +162,7 @@ def test_save_updates_backlinks_incrementally(api):
         },
     )
     assert status == 200
+    assert not (api.work / "links-index.json").exists()
     status, results = api.request("GET", "/api/search?q=new-target&mode=links")
     assert status == 200
     assert results["results"] == [

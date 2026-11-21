@@ -12,5 +12,6 @@ playwright-report/
 
 help/links-index.json
 help/.trash/
+.telar-config/
 CLAUDE.md
 AGENTS.md

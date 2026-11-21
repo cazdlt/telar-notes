@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from telar import config as telar_config
 from telar.app import create_app
 from telar.config import TelarConfig
 
@@ -21,6 +22,8 @@ class ApiHarness:
     def __init__(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        self._orig_config_dir = telar_config.CONFIG_DIR
+        telar_config.CONFIG_DIR = self.root
         self.work = self.root / "work"
         self.personal = self.root / "personal"
         self.work.mkdir()
@@ -33,6 +36,7 @@ class ApiHarness:
 
     def reset(self) -> None:
         """Restore the reference contents before a test."""
+        shutil.rmtree(self.root / "indexes", ignore_errors=True)
         self.config.save(
             {
                 "vaults": [
@@ -76,6 +80,7 @@ class ApiHarness:
     def close(self) -> None:
         """Close the TestClient and delete temporary data."""
         self.client.close()
+        telar_config.CONFIG_DIR = self._orig_config_dir
         self.tmp.cleanup()
 
 

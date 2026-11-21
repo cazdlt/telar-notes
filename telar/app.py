@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import time
 import urllib.parse
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable
 
 from fastapi import FastAPI, Request, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -15,6 +16,18 @@ from telar.deps import AppState, api_error
 from telar.routes import files, links, search, settings, static, tasks
 
 MAX_BODY_BYTES = 50 * 1024 * 1024
+_DEFAULT_ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost"})
+
+
+def _parse_allowed_hosts(extra: Iterable[str] | None = None) -> frozenset[str]:
+    """Return normalized Host/Origin hostnames including localhost defaults."""
+    raw = (
+        os.environ.get("TELAR_ALLOWED_HOSTS", "").split(",") if extra is None else extra
+    )
+    entries = {
+        host for entry in raw if (host := entry.split(":", 1)[0].strip().lower())
+    }
+    return _DEFAULT_ALLOWED_HOSTS | entries
 
 
 def create_app(
@@ -22,8 +35,10 @@ def create_app(
     config: TelarConfig,
     session_path: str,
     activity: dict[str, float] | None = None,
+    allowed_hosts: Iterable[str] | None = None,
 ) -> FastAPI:
     """Create and configure the Telar Notes FastAPI application."""
+    allowed = _parse_allowed_hosts(allowed_hosts)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     tracker = activity if activity is not None else {"t": time.time()}
     app.state.telar = AppState(
@@ -38,14 +53,14 @@ def create_app(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        # Localhost-only API: block cross-origin browser access and DNS-rebinding.
-        host = (request.headers.get("host") or "").split(":")[0]
-        if host not in ("127.0.0.1", "localhost"):
+        # Allowed-hosts boundary: block cross-origin browser access and DNS-rebinding.
+        host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+        if host not in allowed:
             return api_error(403, "forbidden")
         origin = request.headers.get("origin")
         if origin:
-            origin_host = urllib.parse.urlparse(origin).hostname
-            if origin_host not in ("127.0.0.1", "localhost"):
+            origin_host = (urllib.parse.urlparse(origin).hostname or "").lower()
+            if origin_host not in allowed:
                 return api_error(403, "forbidden")
 
         if request.method == "OPTIONS":

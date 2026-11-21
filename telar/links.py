@@ -1,7 +1,8 @@
-"""Wikilink resolution, links-index.json maintenance, and BFS traversal."""
+"""Wikilink resolution, link index maintenance, and BFS traversal."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import re
@@ -9,6 +10,7 @@ import unicodedata
 from collections import deque
 from typing import Any
 
+from telar import config as telar_config
 from telar.vault import is_note
 
 # Inside Markdown tables the alias pipe is escaped (`[[note\|alias]]`); the backslash is not
@@ -136,16 +138,20 @@ def build_links_index(vault: pathlib.Path) -> dict[str, dict[str, list[str]]]:
     return index
 
 
+def links_index_path(vault: pathlib.Path) -> pathlib.Path:
+    """Return the per-vault link index path inside ``CONFIG_DIR/indexes/``."""
+    digest = hashlib.sha256(str(vault.resolve()).encode("utf-8")).hexdigest()[:16]
+    return telar_config.CONFIG_DIR / "indexes" / f"{digest}.json"
+
+
 def write_links_index(vault: pathlib.Path, index: dict[str, Any]) -> None:
     """Persist the generated link index."""
-    from telar.config import atomic_write_text
-
-    atomic_write_text(vault / "links-index.json", json.dumps(index, indent=2))
+    telar_config.atomic_write_text(links_index_path(vault), json.dumps(index, indent=2))
 
 
 def load_links_index(vault: pathlib.Path) -> dict[str, dict[str, list[str]]]:
     """Load a complete index, rebuilding missing, corrupt, or partial caches."""
-    idx_path = vault / "links-index.json"
+    idx_path = links_index_path(vault)
     actual_notes = {
         note.relative_to(vault).as_posix()
         for note in vault.rglob("*.md")

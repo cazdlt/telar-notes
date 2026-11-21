@@ -1,8 +1,12 @@
 """Tests for path traversal, Host/Origin checks, static build boundary, and error codes."""
 
 import re
+from pathlib import Path
+
+from fastapi.testclient import TestClient
 
 from telar import config as telar_config
+from telar.app import create_app
 
 
 def test_recent_files_rejects_invalid_sort_and_foreign_origin(api):
@@ -261,3 +265,48 @@ def test_raw_sets_sandbox_headers_and_attachment_for_html(api):
     assert resp.headers["x-content-type-options"] == "nosniff"
     assert "sandbox" in resp.headers["content-security-policy"]
     assert "attachment" in resp.headers["content-disposition"]
+
+
+def _client_with_allowed_hosts(
+    tmp_path: Path, allowed_hosts: list[str] | None = None
+) -> TestClient:
+    """Create a TestClient for an isolated app with optional allowed_hosts."""
+    vault = tmp_path / "vault"
+    vault.mkdir(exist_ok=True)
+    app = create_app(
+        str(vault),
+        telar_config.TelarConfig(tmp_path / "config.json"),
+        str(tmp_path / ".session"),
+        allowed_hosts=allowed_hosts,
+    )
+    return TestClient(app, base_url="http://127.0.0.1:7731")
+
+
+def _assert_allowed_hosts_boundary(client: TestClient) -> None:
+    """Assert configured hosts/origins succeed and unlisted ones return 403."""
+    for headers in (
+        {"Host": "telar.zamoradelatorre.com"},
+        {"Host": "FLORESTA.LOCAL:7731"},
+        {"Origin": "https://telar.zamoradelatorre.com"},
+    ):
+        assert client.get("/api/config", headers=headers).status_code == 200, headers
+    for headers in (
+        {"Host": "evil.test"},
+        {"Origin": "https://evil.test"},
+    ):
+        assert client.get("/api/config", headers=headers).status_code == 403, headers
+
+
+def test_allowed_hosts_parameter_permits_configured_hosts(tmp_path):
+    with _client_with_allowed_hosts(
+        tmp_path, ["telar.zamoradelatorre.com", "floresta.local"]
+    ) as client:
+        _assert_allowed_hosts_boundary(client)
+
+
+def test_allowed_hosts_env_var_permits_configured_hosts(tmp_path, monkeypatch):
+    monkeypatch.setenv(
+        "TELAR_ALLOWED_HOSTS", "telar.zamoradelatorre.com, floresta.local "
+    )
+    with _client_with_allowed_hosts(tmp_path) as client:
+        _assert_allowed_hosts_boundary(client)

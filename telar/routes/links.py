@@ -46,7 +46,7 @@ def get_links(
 
 @router.post("/api/links/rebuild")
 def post_links_rebuild(vault: pathlib.Path = Depends(get_vault)) -> dict[str, Any]:
-    """Rebuild ``links-index.json`` from disk for the active vault."""
+    """Rebuild the link index from disk for the active vault."""
     index = build_links_index(vault)
     write_links_index(vault, index)
     return index

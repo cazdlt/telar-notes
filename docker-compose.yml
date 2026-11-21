@@ -1,12 +1,13 @@
 services:
   telar-notes:
     build: .
+    user: "${TELAR_UID:-1000}:${TELAR_GID:-1000}"
     ports:
       - "127.0.0.1:${TELAR_PORT:-7731}:7731"
+    environment:
+      XDG_CONFIG_HOME: /config
+      TELAR_ALLOWED_HOSTS: "${TELAR_ALLOWED_HOSTS:-}"
     volumes:
       - "${VAULT_PATH:-./help}:/vault"
-      - telar-config:/root/.config/telar
+      - "${TELAR_CONFIG_PATH:-./.telar-config}:/config"
     restart: unless-stopped
-
-volumes:
-  telar-config:

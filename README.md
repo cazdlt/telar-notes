@@ -56,14 +56,21 @@ uv run python server.py --vault /path/to/your-vault --port 7731
 Run locally with Docker Compose (bound to `127.0.0.1` only):
 
 ```bash
-VAULT_PATH=/path/to/your-vault docker compose up --build
+VAULT_PATH=/path/to/your-vault TELAR_UID=$(id -u) TELAR_GID=$(id -g) docker compose up --build
 ```
 
-If `VAULT_PATH` is omitted, it mounts the bundled `./help` vault. Then open <http://127.0.0.1:7731>.
+Then open <http://127.0.0.1:7731>.
+
+Environment variables:
+
+- `VAULT_PATH`: Vault directory mounted at `/vault` (defaults to `./help`).
+- `TELAR_CONFIG_PATH`: Host directory mounted at `/config` (`XDG_CONFIG_HOME`) for app config and link indexes (defaults to `./.telar-config`).
+- `TELAR_UID` / `TELAR_GID`: Host user and group IDs the container runs as (defaults to `1000:1000`). Match your host or Syncthing user so atomic writes (`0600`) remain owned by the right user.
+- `TELAR_ALLOWED_HOSTS`: Optional comma-separated hostnames allowed in `Host` / `Origin` headers (empty by default). Set this only when fronting Telar with a private reverse proxy/VPN (such as Tailscale + Caddy), as Telar has no built-in authentication and must never be exposed to the public internet.
 
 ## Configuration
 
-Configuration is stored at `~/.config/telar/config.json` (or `$XDG_CONFIG_HOME/telar/config.json` if `XDG_CONFIG_HOME` is set). To configure multiple vaults:
+Configuration is stored at `~/.config/telar/config.json` (or `$XDG_CONFIG_HOME/telar/config.json` if `XDG_CONFIG_HOME` is set), and per-vault link indexes are stored under `$XDG_CONFIG_HOME/telar/indexes/` (not inside the vault). To configure multiple vaults:
 
 ```json
 {
