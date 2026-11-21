@@ -8,6 +8,7 @@ import itertools
 import os
 import pathlib
 import re
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -117,30 +118,77 @@ def is_note(vault: pathlib.Path, path: pathlib.Path) -> bool:
     return True
 
 
+def iter_notes(vault: pathlib.Path) -> Iterator[tuple[pathlib.Path, str]]:
+    """Yield ``(path, rel_posix)`` for every visible Markdown note in ``vault``."""
+    stack: list[tuple[pathlib.Path, str]] = [(vault, "")]
+    while stack:
+        current_dir, prefix = stack.pop()
+        try:
+            with os.scandir(current_dir) as it:
+                for entry in it:
+                    name = entry.name
+                    if name.startswith("."):
+                        continue
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append((pathlib.Path(entry.path), f"{prefix}{name}/"))
+                        elif (
+                            name.endswith(".md")
+                            and not name.endswith(".excalidraw.md")
+                            and entry.is_file(follow_symlinks=False)
+                        ):
+                            yield pathlib.Path(entry.path), f"{prefix}{name}"
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+
+
+def _scan_tree(dir_path: pathlib.Path, rel_prefix: str) -> list[dict[str, Any]]:
+    """Recursively build file tree entries using ``os.scandir``."""
+    scanned: list[tuple[bool, str, os.DirEntry[str], bool]] = []
+    try:
+        with os.scandir(dir_path) as it:
+            for entry in it:
+                if hidden_from_explorer(entry.name):
+                    continue
+                try:
+                    if entry.is_symlink():
+                        continue
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                except OSError:
+                    continue
+                scanned.append((not is_dir, entry.name.lower(), entry, is_dir))
+    except PermissionError:
+        return []
+    scanned.sort(key=lambda item: (item[0], item[1]))
+    entries: list[dict[str, Any]] = []
+    for _, _, entry, is_dir in scanned:
+        rel = f"{rel_prefix}{entry.name}"
+        if is_dir:
+            entries.append(
+                {
+                    "path": rel,
+                    "type": "dir",
+                    "children": _scan_tree(pathlib.Path(entry.path), f"{rel}/"),
+                }
+            )
+        else:
+            entries.append({"path": rel, "type": "file", "name": entry.name})
+    return entries
+
+
 def build_tree(
     vault_path: pathlib.Path, rel_base: pathlib.Path | None = None
 ) -> list[dict[str, Any]]:
     """Recursively build file tree, skipping hidden files, symlinks, and links-index."""
-    if rel_base is None:
-        rel_base = vault_path
-    entries: list[dict[str, Any]] = []
-    try:
-        items = sorted(
-            vault_path.iterdir(), key=lambda p: (p.is_file(), p.name.lower())
-        )
-    except PermissionError:
-        return entries
-    for item in items:
-        if hidden_from_explorer(item.name) or item.is_symlink():
-            continue
-        rel = str(item.relative_to(rel_base))
-        if item.is_dir():
-            entries.append(
-                {"path": rel, "type": "dir", "children": build_tree(item, rel_base)}
-            )
-        else:
-            entries.append({"path": rel, "type": "file", "name": item.name})
-    return entries
+    if rel_base is None or rel_base == vault_path:
+        rel_prefix = ""
+    else:
+        rel_prefix = f"{vault_path.relative_to(rel_base)}/"
+    return _scan_tree(vault_path, rel_prefix)
 
 
 def recent_files(vault: pathlib.Path, sort: str, limit: int) -> list[dict[str, Any]]:

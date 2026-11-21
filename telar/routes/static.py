@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Response
+from fastapi.responses import FileResponse
 
 import telar.config as telar_config
 from telar.deps import api_error
@@ -26,10 +27,7 @@ def get_index() -> Response:
     index_path = telar_config.DIST_DIR / "index.html"
     if not index_path.exists():
         return api_error(503, "frontend build not found")
-    return Response(
-        content=index_path.read_bytes(),
-        media_type="text/html; charset=utf-8",
-    )
+    return FileResponse(index_path, media_type="text/html; charset=utf-8")
 
 
 @router.get("/excalidraw-editor.html")
@@ -38,10 +36,7 @@ def get_excalidraw_editor() -> Response:
     page_path = telar_config.DIST_DIR / "excalidraw-editor.html"
     if not page_path.is_file():
         return api_error(404, "not found")
-    return Response(
-        content=page_path.read_bytes(),
-        media_type="text/html; charset=utf-8",
-    )
+    return FileResponse(page_path, media_type="text/html; charset=utf-8")
 
 
 @router.get("/assets/{asset_path:path}")
@@ -55,5 +50,5 @@ def get_asset(asset_path: str) -> Response:
         return api_error(403, "forbidden")
     content_type = _ASSET_TYPES.get(target.suffix.lower())
     if content_type and target.is_file():
-        return Response(content=target.read_bytes(), media_type=content_type)
+        return FileResponse(target, media_type=content_type)
     return api_error(404, "not found")

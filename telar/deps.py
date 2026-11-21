@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import pathlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Header, Request
 from fastapi.responses import JSONResponse
 
 from telar.config import TelarConfig
@@ -29,28 +28,23 @@ def get_state(request: Request) -> AppState:
     return request.app.state.telar
 
 
-def get_vault(request: Request, state: AppState = Depends(get_state)) -> pathlib.Path:
+StateDep = Annotated[AppState, Depends(get_state)]
+
+
+def get_vault(
+    state: StateDep,
+    x_vault: Annotated[str | None, Header(alias="X-Vault")] = None,
+) -> pathlib.Path:
     """Resolve the active vault for this request, honoring ``X-Vault``."""
     return active_vault(
         state.fallback_vault,
         state.config,
         state.session_path,
-        request.headers.get("X-Vault"),
+        x_vault,
     )
 
 
-async def read_json_body(request: Request) -> dict[str, Any]:
-    """Parse an optional JSON object body, returning ``{}`` when empty."""
-    raw = await request.body()
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as error:
-        raise HTTPException(status_code=400, detail="invalid json") from error
-    if not isinstance(parsed, dict):
-        raise HTTPException(status_code=400, detail="json object required")
-    return parsed
+VaultDep = Annotated[pathlib.Path, Depends(get_vault)]
 
 
 def api_error(status: int, message: str, **extra: Any) -> JSONResponse:

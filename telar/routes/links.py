@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
-from telar.deps import AppState, get_state, get_vault
+from telar.deps import StateDep, VaultDep
 from telar.links import build_links_index, load_links_index, write_links_index
 
 router = APIRouter()
@@ -15,9 +15,9 @@ router = APIRouter()
 
 @router.get("/api/links")
 def get_links(
-    vault_param: str | None = Query(default=None, alias="vault"),
-    state: AppState = Depends(get_state),
-    active: pathlib.Path = Depends(get_vault),
+    state: StateDep,
+    active: VaultDep,
+    vault_param: Annotated[str | None, Query(alias="vault")] = None,
 ) -> dict[str, Any]:
     """Return forward/backward link index for one vault or all vaults."""
     cfg = state.config.load()
@@ -45,7 +45,7 @@ def get_links(
 
 
 @router.post("/api/links/rebuild")
-def post_links_rebuild(vault: pathlib.Path = Depends(get_vault)) -> dict[str, Any]:
+def post_links_rebuild(vault: VaultDep) -> dict[str, Any]:
     """Rebuild the link index from disk for the active vault."""
     index = build_links_index(vault)
     write_links_index(vault, index)

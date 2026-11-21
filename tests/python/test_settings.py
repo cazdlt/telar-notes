@@ -4,7 +4,7 @@ import json
 import shutil
 import subprocess
 
-from telar.config import TelarConfig
+from telar.config import TelarConfig, validate_preferences, vault_settings
 
 
 def test_config_round_trip_and_active_vault_selection(tmp_path):
@@ -363,3 +363,44 @@ def test_pick_vault_folder_reports_path_cancel_and_platform(api, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda _: None)
     status, _ = api.request("POST", "/api/vaults/pick", {})
     assert status == 501
+
+
+def test_preferences_and_vault_settings_fallback_per_field(tmp_path):
+    prefs = validate_preferences(
+        {
+            "font_size": 99,
+            "ui_font_size": 18.9,
+            "theme": 123,
+            "aesthetic": "x" * 21,
+            "persistent_live_preview": "no",
+            "unknown": "ignored",
+        }
+    )
+    assert prefs == {
+        "theme": "dark",
+        "aesthetic": "ink",
+        "font_size": 16,
+        "ui_font_size": 18,
+        "persistent_live_preview": True,
+    }
+
+    vault = tmp_path / "v"
+    vault.mkdir()
+    key = str(vault.resolve())
+    vs = vault_settings(
+        {
+            "vault_settings": {
+                key: {
+                    "files": {"attachment_folder": "  ./adjuntos  "},
+                    "plugins": {
+                        "recent-files": {"enabled": False, "limit": 999},
+                        "tasks": "not-a-dict",
+                    },
+                }
+            }
+        },
+        vault,
+    )
+    assert vs["files"]["attachment_folder"] == "./adjuntos"
+    assert vs["plugins"]["recent-files"] == {"enabled": False, "limit": 20}
+    assert vs["plugins"]["tasks"]["enabled"] is True

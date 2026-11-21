@@ -8,16 +8,23 @@ import pathlib
 import shutil
 import subprocess
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Body, Header, Query, Response
+from fastapi.responses import FileResponse, JSONResponse
 
 from telar.config import atomic_write_text, vault_settings
-from telar.deps import AppState, api_error, get_state, get_vault, read_json_body
+from telar.deps import StateDep, VaultDep, api_error
 from telar.links import update_links_index
+from telar.schemas import (
+    AttachRequest,
+    NotePatchRequest,
+    NoteWriteRequest,
+    PathRequest,
+    PeriodicTodayRequest,
+    RenameRequest,
+)
 from telar.sections import (
-    SectionError,
     parse_outline,
     patch_note,
     read_lines,
@@ -26,7 +33,6 @@ from telar.sections import (
 from telar.tasks import invalidate_tasks, parse_iso_date
 from telar.vault import (
     RECENT_LIMIT_MAX,
-    RECENT_SORTS,
     attachment_dir,
     build_tree,
     format_periodic_date,
@@ -41,25 +47,19 @@ router = APIRouter()
 
 
 @router.get("/api/files")
-def get_files(vault: pathlib.Path = Depends(get_vault)) -> dict[str, Any]:
+def get_files(vault: VaultDep) -> dict[str, Any]:
     """Return the visible file and directory tree for the active vault."""
     return {"tree": build_tree(vault)}
 
 
 @router.get("/api/files/recent")
 def get_recent_files(
-    sort: str = "modified",
-    limit: str = "50",
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    sort: Annotated[Literal["modified", "created"], Query()] = "modified",
+    limit: Annotated[int, Query()] = 50,
 ) -> Response:
     """Return recently modified or created openable files."""
-    if sort not in RECENT_SORTS:
-        return api_error(400, "invalid sort")
-    try:
-        parsed_limit = int(limit)
-    except ValueError:
-        return api_error(400, "invalid limit")
-    clamped = min(max(parsed_limit, 1), RECENT_LIMIT_MAX)
+    clamped = min(max(limit, 1), RECENT_LIMIT_MAX)
     return JSONResponse({"files": recent_files(vault, sort, clamped)})
 
 
@@ -83,8 +83,8 @@ def _read_existing_note(
 
 @router.get("/api/note/outline")
 def get_note_outline(
-    path: str | None = None,
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    path: Annotated[str | None, Query()] = None,
 ) -> Response:
     """Return the Markdown heading outline and current revision for a note."""
     loaded = _read_existing_note(vault, path)
@@ -100,12 +100,12 @@ def get_note_outline(
 
 @router.get("/api/note")
 def get_note(
-    request: Request,
-    path: str | None = None,
-    section: str | None = None,
-    start_line: int | None = None,
-    end_line: int | None = None,
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    path: Annotated[str | None, Query()] = None,
+    section: Annotated[str | None, Query()] = None,
+    start_line: Annotated[int | None, Query()] = None,
+    end_line: Annotated[int | None, Query()] = None,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
 ) -> Response:
     """Read a UTF-8 note (full, by section, or by line range) with ETag support."""
     if section is not None and (start_line is not None or end_line is not None):
@@ -116,20 +116,17 @@ def get_note(
     _, content = loaded
     rev = revision(content)
     if section is None and start_line is None and end_line is None:
-        if request.headers.get("If-None-Match") == rev:
+        if if_none_match == rev:
             return Response(status_code=304, headers={"ETag": rev})
         return JSONResponse(
             {"path": path, "content": content, "revision": rev},
             headers={"ETag": rev},
         )
-    try:
-        slice_payload = (
-            read_section(content, section)
-            if section is not None
-            else read_lines(content, start_line, end_line)
-        )
-    except SectionError as error:
-        return api_error(error.status, error.message, **error.extra)
+    slice_payload = (
+        read_section(content, section)
+        if section is not None
+        else read_lines(content, start_line, end_line)
+    )
     return JSONResponse(
         {"path": path, "revision": rev, **slice_payload},
         headers={"ETag": rev},
@@ -138,38 +135,34 @@ def get_note(
 
 @router.post("/api/note/patch")
 def post_note_patch(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: NotePatchRequest,
+    vault: VaultDep,
 ) -> Response:
     """Apply a surgical patch to an existing note with optional concurrency check."""
-    rel = body.get("path")
-    loaded = _read_existing_note(vault, rel if isinstance(rel, str) else None)
+    loaded = _read_existing_note(vault, body.path)
     if isinstance(loaded, Response):
         return loaded
-    assert isinstance(rel, str)
     target, content = loaded
     current_rev = revision(content)
-    base_revision = body.get("base_revision")
-    if base_revision is not None and base_revision != current_rev:
+    if body.base_revision is not None and body.base_revision != current_rev:
         return api_error(409, "note changed on disk", revision=current_rev)
-    try:
-        new_content, diff = patch_note(content, rel, body)
-    except SectionError as error:
-        return api_error(error.status, error.message, **error.extra)
-    if body.get("dry_run") is True:
+    new_content, diff = patch_note(
+        content, body.path, body.model_dump(exclude_none=True)
+    )
+    if body.dry_run:
         return JSONResponse(
             {"ok": True, "dry_run": True, "revision": current_rev, "diff": diff}
         )
     atomic_write_text(target, new_content)
-    update_links_index(vault, rel, new_content)
-    invalidate_tasks(vault, rel)
+    update_links_index(vault, body.path, new_content)
+    invalidate_tasks(vault, body.path)
     return JSONResponse({"ok": True, "revision": revision(new_content), "diff": diff})
 
 
 @router.get("/api/raw")
 def get_raw(
-    path: str | None = None,
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    path: Annotated[str | None, Query()] = None,
 ) -> Response:
     """Serve raw file bytes with a detected Content-Type."""
     if not path:
@@ -187,55 +180,53 @@ def get_raw(
     }
     if target.suffix.lower() in {".html", ".htm", ".xhtml", ".svg", ".xml"}:
         headers["Content-Disposition"] = f'attachment; filename="{target.name}"'
-    return Response(content=target.read_bytes(), media_type=ctype, headers=headers)
+    return FileResponse(target, media_type=ctype, headers=headers)
 
 
 @router.post("/api/note")
 def post_note(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: NoteWriteRequest,
+    vault: VaultDep,
 ) -> Response:
     """Create or update a note atomically with optimistic concurrency."""
-    rel = body.get("path")
-    content = body.get("content", "")
-    base_revision = body.get("base_revision")
-    force = body.get("force") is True
-    if not rel or not isinstance(content, str):
-        return api_error(400, "path required")
     try:
-        target = resolve_vault_path(vault, rel)
+        target = resolve_vault_path(vault, body.path)
     except ValueError:
         return api_error(400, "path outside vault")
     previous = target.read_text() if target.exists() else None
     current_revision = revision(previous) if previous is not None else None
-    if previous is not None and not force and base_revision != current_revision:
+    if (
+        previous is not None
+        and not body.force
+        and body.base_revision != current_revision
+    ):
         return api_error(
             409,
             "note changed on disk",
             revision=current_revision,
             content=previous,
         )
-    if previous is None and base_revision not in (None, ""):
+    if previous is None and body.base_revision not in (None, ""):
         return api_error(409, "note was removed")
-    atomic_write_text(target, content)
-    update_links_index(vault, rel, content)
-    invalidate_tasks(vault, rel)
-    return JSONResponse({"ok": True, "revision": revision(content)})
+    atomic_write_text(target, body.content)
+    update_links_index(vault, body.path, body.content)
+    invalidate_tasks(vault, body.path)
+    return JSONResponse({"ok": True, "revision": revision(body.content)})
 
 
 @router.post("/api/periodic/today")
 def post_periodic_today(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    state: StateDep,
+    vault: VaultDep,
+    body: Annotated[PeriodicTodayRequest | None, Body()] = None,
 ) -> Response:
     """Open or create a periodic daily note from the configured template."""
     settings = vault_settings(state.config.load(), vault)["plugins"]["periodic-notes"]
     if not settings["enabled"]:
         return api_error(409, "Periodic Notes is disabled")
-    raw_date = body.get("date")
+    raw_date = body.date if body is not None else None
     try:
-        dt = parse_iso_date(raw_date) if isinstance(raw_date, str) else datetime.now()
+        dt = parse_iso_date(raw_date) if raw_date is not None else datetime.now()
     except ValueError:
         return api_error(400, "invalid date")
     folder, pattern, template_path = (
@@ -281,36 +272,20 @@ def post_periodic_today(
 
 @router.post("/api/attach")
 def post_attach(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    body: AttachRequest,
+    state: StateDep,
+    vault: VaultDep,
 ) -> Response:
     """Save a base64-encoded attachment into the configured attachment folder."""
-    note = body.get("note")
-    filename = body.get("filename")
-    data_b64 = body.get("data_b64")
-    dir_rel = body.get("dir")
-    if (
-        not isinstance(filename, str)
-        or not filename
-        or filename in (".", "..")
-        or "/" in filename
-        or "\\" in filename
-        or not isinstance(data_b64, str)
-        or not (note or dir_rel)
-    ):
-        return api_error(400, "note or dir, plus safe filename and data_b64, required")
     try:
-        raw_bytes = base64.b64decode(data_b64, validate=True)
+        raw_bytes = base64.b64decode(body.data_b64, validate=True)
     except ValueError:
         return api_error(400, "invalid base64 data")
 
     vault_root = vault.resolve()
-    if dir_rel:
-        if not isinstance(dir_rel, str):
-            return api_error(400, "dir must be a string")
-        dest_dir = vault if dir_rel == "." else vault / dir_rel
-        dest = dest_dir / filename
+    if body.dir:
+        dest_dir = vault if body.dir == "." else vault / body.dir
+        dest = dest_dir / body.filename
         try:
             dest.resolve().relative_to(vault_root)
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -322,10 +297,9 @@ def post_attach(
         rel = dest.relative_to(vault).as_posix()
         return JSONResponse({"ok": True, "embed": rel, "path": rel})
 
-    if not isinstance(note, str):
-        return api_error(400, "note must be a string")
+    assert body.note is not None
     folder = vault_settings(state.config.load(), vault)["files"]
-    dest = attachment_dir(vault, note, folder["attachment_folder"]) / filename
+    dest = attachment_dir(vault, body.note, folder["attachment_folder"]) / body.filename
     try:
         dest.resolve().relative_to(vault_root)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -345,15 +319,12 @@ def post_attach(
 
 @router.post("/api/mkdir")
 def post_mkdir(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: PathRequest,
+    vault: VaultDep,
 ) -> Response:
     """Create a directory inside the active vault."""
-    rel = body.get("path")
-    if not rel:
-        return api_error(400, "path required")
     try:
-        target = resolve_vault_path(vault, rel)
+        target = resolve_vault_path(vault, body.path)
     except ValueError:
         return api_error(400, "path outside vault")
     if target.exists():
@@ -364,17 +335,13 @@ def post_mkdir(
 
 @router.post("/api/rename")
 def post_rename(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: RenameRequest,
+    vault: VaultDep,
 ) -> Response:
     """Move or rename a file or directory without overwriting."""
-    src_rel = body.get("from")
-    dst_rel = body.get("to")
-    if not src_rel or not dst_rel:
-        return api_error(400, "from and to required")
     try:
-        src = resolve_vault_path(vault, src_rel)
-        dst = resolve_vault_path(vault, dst_rel)
+        src = resolve_vault_path(vault, body.src)
+        dst = resolve_vault_path(vault, body.dst)
     except ValueError:
         return api_error(400, "path outside vault")
     if not src.exists():
@@ -388,15 +355,12 @@ def post_rename(
 
 @router.post("/api/delete")
 def post_delete(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: PathRequest,
+    vault: VaultDep,
 ) -> Response:
     """Soft-delete a file or directory into ``.trash/``."""
-    rel = body.get("path")
-    if not rel:
-        return api_error(400, "path required")
     try:
-        target = resolve_vault_path(vault, rel)
+        target = resolve_vault_path(vault, body.path)
     except ValueError:
         return api_error(400, "path outside vault")
     if not target.exists():
@@ -413,15 +377,12 @@ def post_delete(
 
 @router.post("/api/reveal")
 def post_reveal(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: PathRequest,
+    vault: VaultDep,
 ) -> Response:
     """Reveal a vault-relative file or folder in macOS Finder."""
-    rel = body.get("path")
-    if not rel:
-        return api_error(400, "path required")
     try:
-        target = resolve_vault_path(vault, rel)
+        target = resolve_vault_path(vault, body.path)
     except ValueError:
         return api_error(400, "path outside vault")
     if not target.exists():

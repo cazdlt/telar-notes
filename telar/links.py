@@ -11,7 +11,7 @@ from collections import deque
 from typing import Any
 
 from telar import config as telar_config
-from telar.vault import is_note
+from telar.vault import iter_notes
 
 # Inside Markdown tables the alias pipe is escaped (`[[note\|alias]]`); the backslash is not
 # part of the target. Obsidian counts embeds (`![[note#^block]]`, `![[image.png]]`) as links.
@@ -46,17 +46,19 @@ def strip_code(content: str) -> str:
     return content
 
 
+def _add_to_catalog(catalog: dict[str, list[str]], rel: str) -> None:
+    """Register every shortest-path suffix of ``rel`` in ``catalog``."""
+    parts = pathlib.PurePosixPath(rel).parts
+    for start in range(len(parts)):
+        suffix = link_key(pathlib.PurePosixPath(*parts[start:]).as_posix())
+        catalog.setdefault(suffix, []).append(rel)
+
+
 def build_link_catalog(vault: pathlib.Path) -> dict[str, list[str]]:
     """Map every Obsidian-style shortest path to its matching notes."""
     catalog: dict[str, list[str]] = {}
-    for note in vault.rglob("*.md"):
-        if not is_note(vault, note):
-            continue
-        rel = note.relative_to(vault).as_posix()
-        parts = pathlib.PurePosixPath(rel).parts
-        for start in range(len(parts)):
-            suffix = link_key(pathlib.PurePosixPath(*parts[start:]).as_posix())
-            catalog.setdefault(suffix, []).append(rel)
+    for _, rel in iter_notes(vault):
+        _add_to_catalog(catalog, rel)
     return catalog
 
 
@@ -67,7 +69,8 @@ def resolve_link(
     catalog: dict[str, list[str]] | None = None,
 ) -> str:
     """Resolve [[raw_link]] to a vault-relative path. Keeps an explicit extension."""
-    catalog = catalog or build_link_catalog(vault)
+    if catalog is None:
+        catalog = build_link_catalog(vault)
     target = raw_link.strip()
     if not pathlib.PurePosixPath(target).suffix:
         target = target + ".md"
@@ -107,7 +110,8 @@ def extract_targets(
     catalog: dict[str, list[str]] | None = None,
 ) -> list[str]:
     """Forward-link targets for one note, embeds included: strip code, resolve."""
-    catalog = catalog or build_link_catalog(vault)
+    if catalog is None:
+        catalog = build_link_catalog(vault)
     targets: list[str] = []
     for match in _INDEX_LINK.finditer(strip_code(content)):
         target = resolve_link(vault, rel_path, match.group(1), catalog)
@@ -118,16 +122,15 @@ def extract_targets(
 
 def build_links_index(vault: pathlib.Path) -> dict[str, dict[str, list[str]]]:
     """Build the full forward and backward link index for a vault."""
+    notes: list[tuple[pathlib.Path, str]] = []
+    catalog: dict[str, list[str]] = {}
     index: dict[str, dict[str, list[str]]] = {}
-    md_files = [f for f in vault.rglob("*.md") if is_note(vault, f)]
-    catalog = build_link_catalog(vault)
-    for f in md_files:
-        rel = str(f.relative_to(vault))
-        if rel not in index:
-            index[rel] = {"links_to": [], "linked_from": []}
-    for f in md_files:
-        rel = str(f.relative_to(vault))
-        content = f.read_text(errors="replace")
+    for path, rel in iter_notes(vault):
+        notes.append((path, rel))
+        _add_to_catalog(catalog, rel)
+        index[rel] = {"links_to": [], "linked_from": []}
+    for path, rel in notes:
+        content = path.read_text(errors="replace")
         for target in extract_targets(vault, rel, content, catalog):
             if target not in index[rel]["links_to"]:
                 index[rel]["links_to"].append(target)
@@ -152,11 +155,7 @@ def write_links_index(vault: pathlib.Path, index: dict[str, Any]) -> None:
 def load_links_index(vault: pathlib.Path) -> dict[str, dict[str, list[str]]]:
     """Load a complete index, rebuilding missing, corrupt, or partial caches."""
     idx_path = links_index_path(vault)
-    actual_notes = {
-        note.relative_to(vault).as_posix()
-        for note in vault.rglob("*.md")
-        if is_note(vault, note)
-    }
+    actual_notes = {rel for _, rel in iter_notes(vault)}
     try:
         index = json.loads(idx_path.read_text())
         if not isinstance(index, dict):

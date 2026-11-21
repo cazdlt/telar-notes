@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import pathlib
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Query, Response
 from fastapi.responses import JSONResponse
 
 from telar.config import vault_settings
-from telar.deps import AppState, api_error, get_state, get_vault, read_json_body
+from telar.deps import StateDep, VaultDep, api_error
+from telar.schemas import TaskAddRequest, TaskBlockIdRequest, TaskUpdateRequest
 from telar.task_query import query_tasks
 from telar.tasks import (
     TaskLocationError,
@@ -25,9 +25,9 @@ router = APIRouter()
 
 @router.get("/api/tasks")
 def get_tasks(
-    query: str = "",
-    source: str | None = None,
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    query: Annotated[str, Query()] = "",
+    source: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any]:
     """Execute a Tasks query against the active vault."""
     return query_tasks(vault, query, source)
@@ -35,9 +35,9 @@ def get_tasks(
 
 @router.get("/api/tasks/block")
 def get_task_block(
-    path: str = "",
-    block_id: str = Query(default="", alias="id"),
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    path: Annotated[str, Query()] = "",
+    block_id: Annotated[str, Query(alias="id")] = "",
 ) -> Response:
     """Return the task record matching ``^id`` in ``path``."""
     try:
@@ -57,14 +57,14 @@ def get_task_block(
 
 @router.post("/api/tasks/add")
 def post_tasks_add(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: TaskAddRequest,
+    vault: VaultDep,
 ) -> Response:
     """Format and insert a new task line into an existing note."""
     try:
-        result = add_task_line(vault, body)
-    except TaskLocationError as error:
-        return api_error(error.status, str(error))
+        result = add_task_line(vault, body.model_dump(exclude_none=True))
+    except TaskLocationError:
+        raise
     except ValueError as error:
         return api_error(400, str(error))
     return JSONResponse(result)
@@ -72,20 +72,18 @@ def post_tasks_add(
 
 @router.post("/api/tasks/update")
 def post_tasks_update(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    body: TaskUpdateRequest,
+    state: StateDep,
+    vault: VaultDep,
 ) -> Response:
     """Apply a status, date, or priority patch to a task line."""
-    location, patch = body.get("location"), body.get("patch")
-    if not isinstance(patch, dict):
-        return api_error(400, "location and patch required")
     settings = vault_settings(state.config.load(), vault)["plugins"]["tasks"]
-    dry_run = bool(body.get("dry_run", False))
     try:
-        result = update_task_line(vault, location, patch, settings, dry_run=dry_run)
-    except TaskLocationError as error:
-        return api_error(error.status, str(error))
+        result = update_task_line(
+            vault, body.location, body.patch, settings, dry_run=body.dry_run
+        )
+    except TaskLocationError:
+        raise
     except ValueError as error:
         return api_error(400, str(error))
     return JSONResponse(result)
@@ -93,12 +91,8 @@ def post_tasks_update(
 
 @router.post("/api/tasks/block-id")
 def post_tasks_block_id(
-    body: dict[str, Any] = Depends(read_json_body),
-    vault: pathlib.Path = Depends(get_vault),
+    body: TaskBlockIdRequest,
+    vault: VaultDep,
 ) -> Response:
     """Ensure a task line has a unique ``^id`` block identifier."""
-    try:
-        result = ensure_task_block_id(vault, body.get("location"))
-    except TaskLocationError as error:
-        return api_error(error.status, str(error))
-    return JSONResponse(result)
+    return JSONResponse(ensure_task_block_id(vault, body.location))

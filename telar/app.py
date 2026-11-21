@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -17,6 +18,8 @@ from telar.config import TelarConfig
 from telar.deps import AppState, api_error
 from telar.mcp_server import create_mcp_server
 from telar.routes import files, links, search, settings, static, tasks
+from telar.sections import SectionError
+from telar.tasks import TaskLocationError
 
 MAX_BODY_BYTES = 50 * 1024 * 1024
 _DEFAULT_ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost"})
@@ -110,6 +113,31 @@ def create_app(
     ) -> Response:
         message = "not found" if exc.status_code == 404 else str(exc.detail)
         return api_error(exc.status_code, message)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        _request: Request, exc: RequestValidationError
+    ) -> Response:
+        errors = exc.errors()
+        if errors:
+            first = errors[0]
+            if first.get("loc") == ("query", "sort"):
+                return api_error(400, "invalid sort")
+            msg = str(first.get("msg", "invalid request"))
+            if msg.startswith("Value error, "):
+                msg = msg.removeprefix("Value error, ")
+            return api_error(400, msg)
+        return api_error(400, "invalid request")
+
+    @app.exception_handler(SectionError)
+    async def section_error_handler(_request: Request, exc: SectionError) -> Response:
+        return api_error(exc.status, exc.message, **exc.extra)
+
+    @app.exception_handler(TaskLocationError)
+    async def task_location_error_handler(
+        _request: Request, exc: TaskLocationError
+    ) -> Response:
+        return api_error(exc.status, str(exc))
 
     app.include_router(files.router)
     app.include_router(links.router)

@@ -199,3 +199,20 @@ def test_self_links_are_not_indexed(tmp_path):
 
     assert index["A.md"]["links_to"] == []
     assert index["A.md"]["linked_from"] == []
+
+
+def test_empty_catalog_is_not_rebuilt(tmp_path, monkeypatch):
+    from telar import links
+
+    (tmp_path / "note.md").write_text("hello\n")
+
+    def fail_build(_vault):
+        raise AssertionError("build_link_catalog should not be called")
+
+    monkeypatch.setattr(links, "build_link_catalog", fail_build)
+    assert (
+        links.resolve_link(tmp_path, "note.md", "missing", catalog={}) == "missing.md"
+    )
+    assert links.extract_targets(tmp_path, "note.md", "[[missing]]", catalog={}) == [
+        "missing.md"
+    ]

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import pathlib
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Query
 
-from telar.deps import get_vault
+from telar.deps import VaultDep
 from telar.search import search_notes
 
 router = APIRouter()
@@ -15,9 +14,9 @@ router = APIRouter()
 
 @router.get("/api/search")
 def get_search(
-    q: str = "",
-    mode: str = "all",
-    vault: pathlib.Path = Depends(get_vault),
+    vault: VaultDep,
+    q: Annotated[str, Query()] = "",
+    mode: Annotated[str, Query()] = "all",
 ) -> dict[str, Any]:
     """Search notes in the active vault by title, content, tags, or links."""
     return {"results": search_notes(vault, q, mode)}

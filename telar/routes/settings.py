@@ -7,35 +7,37 @@ import json
 import pathlib
 import shutil
 import subprocess
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Header, Response
 from fastapi.responses import JSONResponse
 
 from telar.config import (
     HELP_DIR,
     HELP_VAULT_NAME,
+    atomic_write_text,
     import_obsidian_settings,
     settings_payload,
     validate_preferences,
     vault_settings,
 )
-from telar.deps import AppState, api_error, get_state, get_vault, read_json_body
+from telar.deps import StateDep, VaultDep, api_error
+from telar.schemas import SettingsUpdateRequest, VaultAddRequest, VaultNameRequest
 from telar.vault import materialize_vaults, registered_vaults, vaults_payload
 
 router = APIRouter()
 
 
 @router.get("/api/config")
-def get_config(state: AppState = Depends(get_state)) -> dict[str, Any]:
+def get_config(state: StateDep) -> dict[str, Any]:
     """Return the effective configuration."""
     return state.config.load()
 
 
 @router.get("/api/settings")
 def get_settings(
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    state: StateDep,
+    vault: VaultDep,
 ) -> dict[str, Any]:
     """Return preferences and active vault settings."""
     return settings_payload(state.config.load(), vault)
@@ -43,20 +45,14 @@ def get_settings(
 
 @router.post("/api/settings")
 def post_settings(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    body: SettingsUpdateRequest,
+    state: StateDep,
+    vault: VaultDep,
 ) -> Response:
     """Validate and persist preferences and active vault settings."""
-    raw_preferences = body.get("preferences")
-    raw_vault_settings = body.get("vault_settings")
-    if not isinstance(raw_preferences, dict) or not isinstance(
-        raw_vault_settings, dict
-    ):
-        return api_error(400, "preferences and vault_settings required")
-    valid_preferences = validate_preferences(raw_preferences)
+    valid_preferences = validate_preferences(body.preferences)
     normalized = vault_settings(
-        {"vault_settings": {str(vault.resolve()): raw_vault_settings}},
+        {"vault_settings": {str(vault.resolve()): body.vault_settings}},
         vault,
     )
     cfg = state.config.load()
@@ -75,8 +71,8 @@ def post_settings(
 
 @router.post("/api/settings/import-obsidian")
 def post_import_obsidian(
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    state: StateDep,
+    vault: VaultDep,
 ) -> dict[str, Any]:
     """Import supported plugin and attachment settings from ``.obsidian/``."""
     cfg = import_obsidian_settings(state.config.load(), vault)
@@ -86,8 +82,8 @@ def post_import_obsidian(
 
 @router.get("/api/vaults")
 def get_vaults(
-    request: Request,
-    state: AppState = Depends(get_state),
+    state: StateDep,
+    x_vault: Annotated[str | None, Header(alias="X-Vault")] = None,
 ) -> dict[str, Any]:
     """List registered vaults along with active and default names."""
     return vaults_payload(
@@ -95,25 +91,21 @@ def get_vaults(
         state.config,
         state.session_path,
         state.config.load(),
-        request.headers.get("X-Vault"),
+        x_vault,
     )
 
 
 @router.post("/api/session/vault")
 def post_session_vault(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
+    body: VaultNameRequest,
+    state: StateDep,
 ) -> Response:
     """Switch the active session vault."""
-    name = body.get("vault")
-    if not name:
-        return api_error(400, "vault required")
+    name = body.vault
     if name not in {
         v["name"] for v in registered_vaults(state.fallback_vault, state.config.load())
     }:
         return api_error(404, "unknown vault")
-    from telar.config import atomic_write_text
-
     session = pathlib.Path(state.session_path)
     atomic_write_text(session, json.dumps({"active_vault": name}))
     return JSONResponse({"ok": True, "active_vault": name})
@@ -144,15 +136,11 @@ def post_vaults_pick() -> Response:
 
 @router.post("/api/vaults/add")
 def post_vaults_add(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
+    body: VaultAddRequest,
+    state: StateDep,
 ) -> Response:
     """Register an existing absolute folder as a vault."""
-    raw_path = body.get("path")
-    raw_name = body.get("name")
-    if not isinstance(raw_path, str) or not raw_path.strip():
-        return api_error(400, "path required")
-    target = pathlib.Path(raw_path.strip()).expanduser()
+    target = pathlib.Path(body.path).expanduser()
     if not target.is_absolute():
         return api_error(400, "path must be absolute")
     target = target.resolve()
@@ -165,10 +153,8 @@ def post_vaults_add(
     if any(pathlib.Path(v["path"]).resolve() == target for v in vaults):
         return api_error(409, "vault already registered")
     names = {v["name"] for v in vaults}
-    if raw_name is not None:
-        if not isinstance(raw_name, str) or not raw_name.strip():
-            return api_error(400, "invalid name")
-        name = raw_name.strip()[:64]
+    if body.name is not None:
+        name = body.name
         if name in names:
             return api_error(409, "vault name taken")
     else:
@@ -185,7 +171,7 @@ def post_vaults_add(
 
 
 @router.post("/api/vaults/help")
-def post_vaults_help(state: AppState = Depends(get_state)) -> Response:
+def post_vaults_help(state: StateDep) -> Response:
     """Register the bundled ``help/`` folder as a vault if absent."""
     cfg = state.config.load()
     vaults = materialize_vaults(state.fallback_vault, cfg)
@@ -214,12 +200,12 @@ def post_vaults_help(state: AppState = Depends(get_state)) -> Response:
 
 @router.post("/api/vaults/remove")
 def post_vaults_remove(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
-    vault: pathlib.Path = Depends(get_vault),
+    body: VaultNameRequest,
+    state: StateDep,
+    vault: VaultDep,
 ) -> Response:
     """Unregister a vault without touching its files."""
-    name = body.get("vault")
+    name = body.vault
     cfg = state.config.load()
     vaults = materialize_vaults(state.fallback_vault, cfg)
     entry = next((v for v in vaults if v["name"] == name), None)
@@ -240,11 +226,11 @@ def post_vaults_remove(
 
 @router.post("/api/vaults/default")
 def post_vaults_default(
-    body: dict[str, Any] = Depends(read_json_body),
-    state: AppState = Depends(get_state),
+    body: VaultNameRequest,
+    state: StateDep,
 ) -> Response:
     """Set the default startup vault."""
-    name = body.get("vault")
+    name = body.vault
     cfg = state.config.load()
     vaults = materialize_vaults(state.fallback_vault, cfg)
     if name not in {v["name"] for v in vaults}:

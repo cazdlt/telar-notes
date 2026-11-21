@@ -3,11 +3,23 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import pathlib
 import tempfile
 from datetime import datetime
 from typing import Any, TypeGuard
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    field_validator,
+    model_validator,
+)
 
 BASE_DIR = pathlib.Path(__file__).resolve().parents[1]
 CONFIG_DIR = (
@@ -19,6 +31,144 @@ DIST_DIR = WEB_DIR / "dist"
 HELP_DIR = BASE_DIR / "help"
 HELP_VAULT_NAME = "Telar Notes Help"
 
+EXCALIDRAW_EMBED_WIDTH_RANGE = (100, 2000)
+RECENT_FILES_LIMIT_RANGE = (1, 200)
+
+
+class _FallbackModel(BaseModel):
+    """Base model that coerces non-dict inputs and falls back per-field on errors."""
+
+    model_config = ConfigDict(extra="ignore", strict=True, populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_non_dict(cls, data: Any) -> Any:
+        return data if isinstance(data, dict) else {}
+
+    @field_validator("*", mode="wrap")
+    @classmethod
+    def _fallback_on_error(
+        cls,
+        value: Any,
+        handler: ValidatorFunctionWrapHandler,
+        info: ValidationInfo,
+    ) -> Any:
+        try:
+            return handler(value)
+        except ValidationError:
+            assert info.field_name is not None
+            field = cls.model_fields[info.field_name]
+            if field.default_factory is not None:
+                factory: Any = field.default_factory
+                return factory()
+            return field.default
+
+
+class Preferences(_FallbackModel):
+    """Validated user UI and editor preferences."""
+
+    theme: str = Field(default="dark", max_length=20)
+    aesthetic: str = Field(default="ink", max_length=20)
+    font_size: int = Field(default=16, ge=10, le=32)
+    ui_font_size: int = Field(default=14, ge=10, le=24)
+    persistent_live_preview: bool = True
+
+    @field_validator("font_size", "ui_font_size", mode="before")
+    @classmethod
+    def _truncate_finite_float(cls, value: Any) -> Any:
+        if isinstance(value, float) and math.isfinite(value):
+            return int(value)
+        return value
+
+
+class TasksSettings(_FallbackModel):
+    """Settings for the Tasks plugin."""
+
+    enabled: bool = True
+    next_status_symbol: str = "x"
+    set_done_date: bool = True
+    set_cancelled_date: bool = True
+    set_created_date: bool = True
+
+
+class PeriodicNotesSettings(_FallbackModel):
+    """Settings for the Periodic Notes plugin."""
+
+    enabled: bool = True
+    folder: str = "diario"
+    format: str = "YYYY/MM/YYYY-MM-DD"
+    template: str = "templates/daily.md"
+
+
+class RecentFilesSettings(_FallbackModel):
+    """Settings for the Recent Files plugin."""
+
+    enabled: bool = True
+    limit: int = Field(
+        default=20, ge=RECENT_FILES_LIMIT_RANGE[0], le=RECENT_FILES_LIMIT_RANGE[1]
+    )
+
+
+class ExcalidrawSettings(_FallbackModel):
+    """Settings for the Excalidraw plugin."""
+
+    enabled: bool = True
+    embed_width: int = Field(
+        default=400,
+        ge=EXCALIDRAW_EMBED_WIDTH_RANGE[0],
+        le=EXCALIDRAW_EMBED_WIDTH_RANGE[1],
+    )
+
+
+class FolderNotesSettings(_FallbackModel):
+    """Settings for the Folder Notes plugin."""
+
+    enabled: bool = True
+
+
+class FilesSettings(_FallbackModel):
+    """Vault file and attachment settings."""
+
+    attachment_folder: str = "/"  # Obsidian's default: vault root
+
+    @field_validator("attachment_folder", mode="before")
+    @classmethod
+    def _validate_attachment_folder(cls, value: Any) -> str:
+        if not valid_attachment_folder(value):
+            raise ValueError("invalid attachment folder")
+        return value.strip()
+
+
+class PluginsSettings(_FallbackModel):
+    """Container for per-vault plugin settings."""
+
+    tasks: TasksSettings = Field(default_factory=TasksSettings)
+    periodic_notes: PeriodicNotesSettings = Field(
+        default_factory=PeriodicNotesSettings, alias="periodic-notes"
+    )
+    recent_files: RecentFilesSettings = Field(
+        default_factory=RecentFilesSettings, alias="recent-files"
+    )
+    excalidraw: ExcalidrawSettings = Field(default_factory=ExcalidrawSettings)
+    folder_notes: FolderNotesSettings = Field(
+        default_factory=FolderNotesSettings, alias="folder-notes"
+    )
+
+
+class VaultSettings(_FallbackModel):
+    """Validated per-vault settings payload."""
+
+    files: FilesSettings = Field(default_factory=FilesSettings)
+    plugins: PluginsSettings = Field(default_factory=PluginsSettings)
+
+
+DEFAULT_PREFERENCES: dict[str, Any] = Preferences().model_dump()
+DEFAULT_TASKS_SETTINGS: dict[str, Any] = TasksSettings().model_dump()
+DEFAULT_PERIODIC_SETTINGS: dict[str, Any] = PeriodicNotesSettings().model_dump()
+DEFAULT_RECENT_FILES_SETTINGS: dict[str, Any] = RecentFilesSettings().model_dump()
+DEFAULT_EXCALIDRAW_SETTINGS: dict[str, Any] = ExcalidrawSettings().model_dump()
+DEFAULT_FOLDER_NOTES_SETTINGS: dict[str, Any] = FolderNotesSettings().model_dump()
+DEFAULT_FILES_SETTINGS: dict[str, Any] = FilesSettings().model_dump()
 DEFAULT_CONFIG: dict[str, Any] = {
     "vaults": [],
     "default_vault": None,
@@ -27,43 +177,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "font_size": 14,
     "diagrams": {"default": "mermaid"},
     "settings_version": 1,
-    "preferences": {
-        "theme": "dark",
-        "aesthetic": "ink",
-        "font_size": 16,
-        "ui_font_size": 14,
-        "persistent_live_preview": True,
-    },
+    "preferences": dict(DEFAULT_PREFERENCES),
     "vault_settings": {},
 }
-DEFAULT_PREFERENCES: dict[str, Any] = {
-    "theme": "dark",
-    "aesthetic": "ink",
-    "font_size": 16,
-    "ui_font_size": 14,
-    "persistent_live_preview": True,
-}
-DEFAULT_TASKS_SETTINGS: dict[str, Any] = {
-    "enabled": True,
-    "next_status_symbol": "x",
-    "set_done_date": True,
-    "set_cancelled_date": True,
-    "set_created_date": True,
-}
-DEFAULT_PERIODIC_SETTINGS: dict[str, Any] = {
-    "enabled": True,
-    "folder": "diario",
-    "format": "YYYY/MM/YYYY-MM-DD",
-    "template": "templates/daily.md",
-}
-DEFAULT_RECENT_FILES_SETTINGS: dict[str, Any] = {"enabled": True, "limit": 20}
-DEFAULT_EXCALIDRAW_SETTINGS: dict[str, Any] = {"enabled": True, "embed_width": 400}
-DEFAULT_FOLDER_NOTES_SETTINGS: dict[str, Any] = {"enabled": True}
-DEFAULT_FILES_SETTINGS: dict[str, Any] = {
-    "attachment_folder": "/"
-}  # Obsidian's default: vault root
-EXCALIDRAW_EMBED_WIDTH_RANGE = (100, 2000)
-RECENT_FILES_LIMIT_RANGE = (1, 200)
 
 
 def atomic_write_text(path: pathlib.Path, content: str) -> None:
@@ -113,88 +229,19 @@ def vault_settings(cfg: dict[str, Any], vault: pathlib.Path) -> dict[str, Any]:
     key = str(vault.resolve())
     all_settings = cfg.get("vault_settings")
     entry = all_settings.get(key, {}) if isinstance(all_settings, dict) else {}
-    plugins = entry.get("plugins", {}) if isinstance(entry, dict) else {}
-    tasks = dict(DEFAULT_TASKS_SETTINGS)
-    periodic = dict(DEFAULT_PERIODIC_SETTINGS)
-    if isinstance(plugins.get("tasks"), dict):
-        tasks.update({k: v for k, v in plugins["tasks"].items() if k in tasks})
-    if isinstance(plugins.get("periodic-notes"), dict):
-        periodic.update(
-            {k: v for k, v in plugins["periodic-notes"].items() if k in periodic}
-        )
-    recent = dict(DEFAULT_RECENT_FILES_SETTINGS)
-    raw_recent = plugins.get("recent-files")
-    if isinstance(raw_recent, dict):
-        if isinstance(raw_recent.get("enabled"), bool):
-            recent["enabled"] = raw_recent["enabled"]
-        limit = raw_recent.get("limit")
-        low, high = RECENT_FILES_LIMIT_RANGE
-        if type(limit) is int and low <= limit <= high:
-            recent["limit"] = limit
-    excalidraw = dict(DEFAULT_EXCALIDRAW_SETTINGS)
-    raw_excalidraw = plugins.get("excalidraw")
-    if isinstance(raw_excalidraw, dict):
-        if isinstance(raw_excalidraw.get("enabled"), bool):
-            excalidraw["enabled"] = raw_excalidraw["enabled"]
-        width = raw_excalidraw.get("embed_width")
-        low, high = EXCALIDRAW_EMBED_WIDTH_RANGE
-        if type(width) is int and low <= width <= high:
-            excalidraw["embed_width"] = width
-    folder_notes = dict(DEFAULT_FOLDER_NOTES_SETTINGS)
-    raw_folder_notes = plugins.get("folder-notes")
-    if isinstance(raw_folder_notes, dict) and isinstance(
-        raw_folder_notes.get("enabled"), bool
-    ):
-        folder_notes["enabled"] = raw_folder_notes["enabled"]
-    files = dict(DEFAULT_FILES_SETTINGS)
-    raw_files = entry.get("files") if isinstance(entry, dict) else None
-    if isinstance(raw_files, dict) and valid_attachment_folder(
-        raw_files.get("attachment_folder")
-    ):
-        files["attachment_folder"] = raw_files["attachment_folder"].strip()
-    return {
-        "files": files,
-        "plugins": {
-            "tasks": tasks,
-            "periodic-notes": periodic,
-            "recent-files": recent,
-            "excalidraw": excalidraw,
-            "folder-notes": folder_notes,
-        },
-    }
+    return VaultSettings.model_validate(entry).model_dump(by_alias=True)
 
 
 def validate_preferences(raw_preferences: dict[str, Any]) -> dict[str, Any]:
     """Validate and clamp user preferences against defaults."""
-    valid = dict(DEFAULT_PREFERENCES)
-    for key, value in raw_preferences.items():
-        if key == "font_size" and isinstance(value, (int, float)) and 10 <= value <= 32:
-            valid[key] = int(value)
-        elif (
-            key == "ui_font_size"
-            and isinstance(value, (int, float))
-            and 10 <= value <= 24
-        ):
-            valid[key] = int(value)
-        elif (
-            key in {"theme", "aesthetic"}
-            and isinstance(value, str)
-            and len(value) <= 20
-        ):
-            valid[key] = value
-        elif key == "persistent_live_preview" and isinstance(value, bool):
-            valid[key] = value
-    return valid
+    return Preferences.model_validate(raw_preferences).model_dump()
 
 
 def settings_payload(cfg: dict[str, Any], vault: pathlib.Path) -> dict[str, Any]:
     """Expose only Telar Notes settings plus the active vault settings."""
-    preferences = dict(DEFAULT_PREFERENCES)
     raw = cfg.get("preferences")
-    if isinstance(raw, dict):
-        preferences.update({k: v for k, v in raw.items() if k in preferences})
     return {
-        "preferences": preferences,
+        "preferences": validate_preferences(raw if isinstance(raw, dict) else {}),
         "vault": str(vault.resolve()),
         "vault_settings": vault_settings(cfg, vault),
         "settings_version": 1,
