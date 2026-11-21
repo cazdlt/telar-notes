@@ -7,9 +7,12 @@ COPY src ./src
 RUN npm ci && npm run build
 
 FROM python:3.14-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
-RUN pip install --no-cache-dir "fastapi>=0.165.0" "pyyaml>=6.0.3" "uvicorn>=0.54.0"
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY telar ./telar
 COPY server.py ./
