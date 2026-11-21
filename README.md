@@ -13,6 +13,7 @@ A local-first web editor for Markdown vaults, built with a Python backend and a 
 - File/folder creation, rename, move, and recoverable deletion (`.trash/`)
 - Pasted images and local embeds
 - Markdown tasks and task queries
+- Bundled `telar-vault` agent skill and zero-dependency CLI for section-level reads, surgical note patches, and task management over HTTP
 - Mermaid diagrams and `.excalidraw` / `.excalidraw.md` editing
 - Themes, font-size controls, reading mode, and multi-vault switching
 - macOS Finder reveal for files and folders
@@ -97,12 +98,28 @@ Configuration is stored at `~/.config/telar/config.json` (or `$XDG_CONFIG_HOME/t
 
 The `--vault` argument acts as a fallback when no vault is configured.
 
+## Agent skill & remote CLI
+
+Telar Notes bundles a generic agent skill in [`skills/telar-vault/`](./skills/telar-vault/SKILL.md) with a zero-dependency Python 3 CLI (`skills/telar-vault/scripts/telar_cli.py`) for coding agents (Claude Code, Codex, etc.) or terminal use:
+
+```bash
+# Install via the open skills CLI, or clone this repo and symlink skills/telar-vault
+npx skills add <owner>/telar-notes --skill telar-vault
+
+# Point to a local or private self-hosted Telar instance
+export TELAR_URL=https://telar.example.com
+export TELAR_VAULT=personal   # optional, sets X-Vault header
+```
+
+See [`docs/http-api.md`](./docs/http-api.md) for the underlying note outline, section read, surgical patch, and task mutation endpoints.
+
 ## Project structure
 
 - `telar/`: FastAPI application package (vault logic, indexers, search, routes)
 - `server.py`: Python CLI runner and backward-compatible entrypoint
 - `src/`: Svelte 5 + TypeScript frontend
 - `excalidraw-editor.html`, `src/excalidraw/`: isolated Excalidraw iframe
+- `skills/telar-vault/`: bundled agent skill and zero-dependency `telar_cli.py` client
 - `scripts/dev.sh`: development server launcher
 - `scripts/deploy.sh`, `scripts/upgrade.sh`: Docker deployment and upgrade helpers
 - `tests/python/`: HTTP API and backend tests (frontend tests live beside source as `src/**/*.test.ts`)
@@ -111,9 +128,9 @@ The `--vault` argument acts as a fallback when no vault is configured.
 ## Quality checks
 
 ```bash
-uv run ruff format --check telar server.py tests/python
-uv run ruff check telar server.py tests/python
-uv run ty check telar server.py tests/python
+uv run ruff format --check telar server.py skills/telar-vault/scripts/telar_cli.py tests/python
+uv run ruff check telar server.py skills/telar-vault/scripts/telar_cli.py tests/python
+uv run ty check telar server.py skills/telar-vault/scripts/telar_cli.py tests/python
 uv run pytest
 npm install
 npm run check
