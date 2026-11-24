@@ -206,6 +206,7 @@
             {@render toggle('Set done date', 'Append ✅ with today’s date when a task is done.', tasks.set_done_date, (value) => tasks.set_done_date = value)}
             {@render toggle('Set cancelled date', 'Append ❌ with today’s date when a task is cancelled.', tasks.set_cancelled_date, (value) => tasks.set_cancelled_date = value)}
             {@render toggle('Set created date', '', tasks.set_created_date, (value) => tasks.set_created_date = value)}
+            {@render toggle('Auto-suggest in editor', 'Suggest dates, priorities, recurrence, and dependencies while typing on task lines.', tasks.auto_suggest, (value) => tasks.auto_suggest = value)}
           {:else if pane === 'periodic-notes'}
             {@const periodic = draft.vault_settings.plugins['periodic-notes']}
             <label class="settings-row"><span class="settings-label">Daily folder<small>Relative to the vault root. Empty means the root.</small></span><input bind:value={periodic.folder} /></label>

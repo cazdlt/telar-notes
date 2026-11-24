@@ -74,4 +74,11 @@ describe('taskAutoSuggest', () => {
     expect(dep?.options[0].label).toBe('⛔ t1');
     expect(dep?.options[0].detail).toBe('Primera tarea');
   });
+
+  it('stays quiet when disabled via settings', async () => {
+    const state = EditorState.create({ doc: '- [ ] Enviar reporte due martes', extensions: [markdown({ extensions: ObsidianGFM })] });
+    const source = taskAutoSuggest({ enabled: () => false, now: () => REF });
+    const ctx = new CompletionContext(state, state.doc.length, false);
+    expect(await source(ctx)).toBeNull();
+  });
 });

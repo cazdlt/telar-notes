@@ -199,6 +199,7 @@ def test_import_obsidian_imports_plugins_and_ignores_invalid_data(api):
                 "setDoneDate": False,
                 "setCancelledDate": "invalid",
                 "setCreatedDate": False,
+                "autoSuggestInEditor": False,
                 "enabled": False,
             },
         ),
@@ -227,6 +228,7 @@ def test_import_obsidian_imports_plugins_and_ignores_invalid_data(api):
         "set_done_date": False,
         "set_cancelled_date": True,
         "set_created_date": False,
+        "auto_suggest": False,
     }
     assert vault_settings["plugins"]["folder-notes"] == {"enabled": True}
     assert vault_settings["plugins"]["recent-files"]["limit"] == 20

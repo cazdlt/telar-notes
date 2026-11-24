@@ -14,6 +14,8 @@ import {
 export type TaskIdCandidate = { id: string; description: string };
 
 export type TaskSuggestOptions = {
+  /** Whether Tasks auto-suggest is enabled for the active vault (defaults to true). */
+  enabled?: () => boolean;
   /** Override current date (useful for deterministic tests). */
   now?: () => Date;
   /** Optional async loader for tasks with `🆔` across the vault (used by `depends on`). */
@@ -211,10 +213,12 @@ function buildRecurrenceSuggestions(arg: string): Completion[] {
  * natural-language EN/ES dates, priorities, recurrence, on-completion, and ID/dependencies.
  */
 export function taskAutoSuggest(options: TaskSuggestOptions = {}): CompletionSource {
+  const isEnabled = options.enabled ?? (() => true);
   const getNow = options.now ?? (() => new Date());
   const genId = options.generateId ?? defaultGenerateId;
 
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
+    if (!isEnabled()) return null;
     const line = context.state.doc.lineAt(context.pos);
     const prefix = TASK_LINE_PREFIX.exec(line.text);
     if (!prefix || !startsWithTaskMarker(prefix[1])) return null;

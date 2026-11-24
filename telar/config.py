@@ -89,6 +89,7 @@ class TasksSettings(_FallbackModel):
     set_done_date: bool = True
     set_cancelled_date: bool = True
     set_created_date: bool = True
+    auto_suggest: bool = True
 
 
 class PeriodicNotesSettings(_FallbackModel):
@@ -312,6 +313,7 @@ def import_obsidian_settings(
                 "setDoneDate": "set_done_date",
                 "setCancelledDate": "set_cancelled_date",
                 "setCreatedDate": "set_created_date",
+                "autoSuggestInEditor": "auto_suggest",
                 "enabled": "enabled",
             }
             daily = external

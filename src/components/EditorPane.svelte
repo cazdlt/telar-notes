@@ -28,6 +28,7 @@
     reading,
     persistentLivePreview,
     drawingsEnabled,
+    taskAutoSuggestEnabled,
     drawingWidth,
     error,
     conflict,
@@ -70,6 +71,7 @@
     reading: boolean;
     persistentLivePreview: boolean;
     drawingsEnabled: boolean;
+    taskAutoSuggestEnabled: boolean;
     drawingWidth: number;
     error: string | null;
     conflict: { external: string; revision: string } | null;
@@ -157,6 +159,7 @@
           reading={() => reading}
           persistent={() => persistentLivePreview}
           drawings={() => drawingsEnabled}
+          taskAutoSuggestEnabled={() => taskAutoSuggestEnabled}
           drawingWidth={() => drawingWidth}
           onChange={onChange}
           onOpenFile={onOpenFile}

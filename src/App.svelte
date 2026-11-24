@@ -119,6 +119,7 @@
   const canGoForward = $derived(historyCanGoForward(history));
   const markdown = (path: string | null) => !!path && /\.(md|markdown)$/i.test(path);
   const drawingsEnabled = $derived(settings?.vault_settings.plugins.excalidraw.enabled ?? true);
+  const taskAutoSuggestEnabled = $derived((settings?.vault_settings.plugins.tasks.enabled ?? true) && (settings?.vault_settings.plugins.tasks.auto_suggest ?? true));
   // With the plugin off, `.excalidraw.md` opens as Markdown and `.excalidraw` as raw text, as in Obsidian.
   const drawing = (path: string | null) => drawingsEnabled && !!path && /\.excalidraw(?:\.md)?$/i.test(path);
   const media = (path: string | null) => !!path && /\.(png|jpe?g|gif|webp|svg)$/i.test(path);
@@ -974,6 +975,7 @@
       {reading}
       {persistentLivePreview}
       {drawingsEnabled}
+      {taskAutoSuggestEnabled}
       drawingWidth={settings?.vault_settings.plugins.excalidraw.embed_width ?? 400}
       {error}
       {conflict}

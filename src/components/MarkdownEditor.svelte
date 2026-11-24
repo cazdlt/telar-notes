@@ -41,6 +41,7 @@
     reading,
     persistent,
     drawings,
+    taskAutoSuggestEnabled = () => true,
     drawingWidth,
     onChange,
     onOpenFile,
@@ -53,6 +54,7 @@
     reading: () => boolean;
     persistent: () => boolean;
     drawings: () => boolean;
+    taskAutoSuggestEnabled?: () => boolean;
     drawingWidth: () => number;
     onChange: (value: string) => void;
     onOpenFile: (path: string, anchor?: string, line?: number) => void;
@@ -100,7 +102,7 @@
           autocompletion({
             override: [
               taskReferenceCompletionSource(files),
-              taskAutoSuggest({ loadTasksWithId: loadOpenTasksWithId }),
+              taskAutoSuggest({ enabled: taskAutoSuggestEnabled, loadTasksWithId: loadOpenTasksWithId }),
               tagAutoSuggest(),
               codeLanguageCompletionSource(),
             ],

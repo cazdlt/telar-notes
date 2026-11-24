@@ -15,8 +15,8 @@ export function registerPlugin<TSettings>(plugin: PluginDefinition<TSettings>): 
 export function registeredPlugins(): PluginDefinition<unknown>[] { return [...plugins.values()]; }
 
 export const tasksPlugin = registerPlugin<TasksSettings>({
-  id: 'tasks', name: 'Tasks', defaults: { enabled: true, next_status_symbol: 'x', set_done_date: true, set_cancelled_date: true, set_created_date: true }, enabled: (settings) => settings.enabled,
-  fields: [{ key: 'enabled', label: 'Enabled', type: 'boolean' }, { key: 'next_status_symbol', label: 'Next status', type: 'select', options: [{ value: 'x', label: 'Done' }, { value: '/', label: 'In progress' }, { value: '-', label: 'Cancelled' }] }, { key: 'set_done_date', label: 'Set done date', type: 'boolean' }, { key: 'set_cancelled_date', label: 'Set cancelled date', type: 'boolean' }, { key: 'set_created_date', label: 'Set created date', type: 'boolean' }],
+  id: 'tasks', name: 'Tasks', defaults: { enabled: true, next_status_symbol: 'x', set_done_date: true, set_cancelled_date: true, set_created_date: true, auto_suggest: true }, enabled: (settings) => settings.enabled,
+  fields: [{ key: 'enabled', label: 'Enabled', type: 'boolean' }, { key: 'next_status_symbol', label: 'Next status', type: 'select', options: [{ value: 'x', label: 'Done' }, { value: '/', label: 'In progress' }, { value: '-', label: 'Cancelled' }] }, { key: 'set_done_date', label: 'Set done date', type: 'boolean' }, { key: 'set_cancelled_date', label: 'Set cancelled date', type: 'boolean' }, { key: 'set_created_date', label: 'Set created date', type: 'boolean' }, { key: 'auto_suggest', label: 'Auto-suggest in editor', type: 'boolean' }],
 });
 
 export const periodicNotesPlugin = registerPlugin<PeriodicNotesSettings>({
