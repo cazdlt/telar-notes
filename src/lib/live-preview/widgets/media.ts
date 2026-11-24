@@ -1,5 +1,6 @@
 import { EditorView, WidgetType } from '@codemirror/view';
 import { api } from '../../api';
+import { codeLanguageOptions, fenceInfoChange } from '../../code-lang';
 import { openDiagramViewer } from '../../diagram-viewer';
 import { excalidrawRenderer } from '../../excalidraw-renderer';
 import { sanitizeSvg } from '../../markdown-renderer';
@@ -26,6 +27,42 @@ export class CopyButtonWidget extends WidgetType {
     });
     return button;
   }
+  ignoreEvent(): boolean { return true; }
+}
+
+export class LanguageSelectWidget extends WidgetType {
+  constructor(
+    private readonly language: string,
+    private readonly lineFrom: number,
+    private readonly reading: boolean,
+  ) { super(); }
+
+  eq(other: LanguageSelectWidget): boolean {
+    return other.language === this.language && other.lineFrom === this.lineFrom && other.reading === this.reading;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const select = document.createElement('select');
+    select.className = 'cm-cb-lang';
+    select.setAttribute('aria-label', 'Code block language');
+    select.disabled = this.reading;
+    for (const option of codeLanguageOptions(this.language)) {
+      const item = document.createElement('option');
+      item.value = option.id;
+      item.textContent = option.label;
+      if (option.id === this.language) item.selected = true;
+      select.append(item);
+    }
+    select.addEventListener('mousedown', (event) => { event.stopPropagation(); });
+    select.addEventListener('change', () => {
+      const line = view.state.doc.lineAt(this.lineFrom);
+      const change = fenceInfoChange(line.text, line.from, select.value);
+      if (!change) return;
+      view.dispatch({ changes: change });
+    });
+    return select;
+  }
+
   ignoreEvent(): boolean { return true; }
 }
 

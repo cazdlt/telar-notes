@@ -23,7 +23,7 @@ import {
   TaskWidget,
   WikiLinkWidget,
 } from './widgets/inline';
-import { CopyButtonWidget, EmbedWidget, MermaidWidget } from './widgets/media';
+import { CopyButtonWidget, EmbedWidget, LanguageSelectWidget, MermaidWidget } from './widgets/media';
 import { TableWidget } from './widgets/table';
 import { TaskRefWidget, TasksBlockWidget } from './widgets/tasks';
 
@@ -299,7 +299,11 @@ export function buildDecorations(
             add(Decoration.replace({}).range(codeLine.from, codeLine.to));
           }
         }
-        if (!active.has(first)) add(Decoration.widget({ widget: new CopyButtonWidget(code), side: 1 }).range(doc.line(first).to));
+        if (!active.has(first)) {
+          const firstLine = doc.line(first);
+          add(Decoration.widget({ widget: new LanguageSelectWidget(language, firstLine.from, reading), side: -1 }).range(firstLine.from));
+          add(Decoration.widget({ widget: new CopyButtonWidget(code), side: 1 }).range(firstLine.to));
+        }
       } else if (name === 'Link' && !revealed(node.from, node.to)) {
         const treeNode = node.node;
         const url = treeNode.getChild('URL');

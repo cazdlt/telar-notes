@@ -60,7 +60,7 @@ body { font-family: var(--font-ui); }
   --save-ok:    #6fae6b;
   --raw-bg:     var(--bg-surface);
   --raw-border: var(--accent);
-  --hl-key:     var(--text-pri);
+  --hl-key:     #7ec8e3;
   --hl-string:  #9bbf72;
   --hl-number:  #c9905a;
   --hl-null:    #e0685f;
@@ -78,7 +78,7 @@ body { font-family: var(--font-ui); }
   --save-ok:    #2f7d3c;
   --raw-bg:     var(--bg-surface);
   --raw-border: var(--accent);
-  --hl-key:     var(--text-pri);
+  --hl-key:     #1d6f8a;
   --hl-string:  #4f7a2e;
   --hl-number:  #a2621f;
   --hl-null:    #c33b30;

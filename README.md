@@ -7,6 +7,7 @@ A local-first web editor for Markdown vaults, built with a Python backend and a 
 ## Features
 
 - Markdown editing with CodeMirror 6 and Live Preview
+- Fenced code blocks with syntax highlighting, language autocomplete, and header language selector
 - Debounced autosave (500 ms) with optimistic concurrency
 - Wikilinks, backlinks, tags, frontmatter, and local graph view
 - Title, content, link, and tag search

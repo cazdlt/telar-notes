@@ -227,6 +227,11 @@
 .cm-cb-open { position: relative; padding: 6px 14px !important; font-family: var(--font-ui) !important; border-top: 1px solid var(--border); border-radius: 8px 8px 0 0; }
 .cm-cb-close { border-bottom: 1px solid var(--border); border-radius: 0 0 8px 8px; padding-bottom: 7px; }
 .cm-cb-open::before { content: attr(data-lang); font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-dim); }
+.cm-cb-open:has(.cm-cb-lang)::before { display: none; }
+.cm-cb-lang { appearance: none; border: 0; padding: 0 2px; background: transparent; font: 700 10px var(--font-ui); letter-spacing: .6px; text-transform: uppercase; color: var(--text-dim); cursor: pointer; }
+.cm-cb-lang:hover:not(:disabled) { color: var(--text-pri); }
+.cm-cb-lang:disabled { cursor: default; opacity: 1; }
+.cm-cb-lang option { color: var(--text-pri); background: var(--bg-surface); text-transform: none; font-weight: 500; }
 .cm-cb-copy { position: absolute; right: 10px; top: 3px; z-index: 3; font: 600 10px var(--font-ui); letter-spacing: .4px; text-transform: uppercase; color: var(--text-sec); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; cursor: pointer; }
 .cm-cb-copy:hover { color: var(--text-pri); border-color: var(--accent); }
 .cm-cb-copy.ok { color: var(--save-ok); border-color: var(--save-ok); }

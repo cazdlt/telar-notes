@@ -13,6 +13,7 @@ Links, tables, embeds, task queries, diagrams and task references are widgets. H
 - Paste or drop an image to save it in your attachment folder and embed it.
 - `![[Note]]` embeds a note, `![[Note#Heading]]` a section, `![[Note#^id]]` one block.
 - Tables, Mermaid fences (` ```mermaid `) and tasks queries render in place.
+- Fenced code blocks support syntax highlighting: type a language after ```` ``` ```` with autocomplete, or pick one from the block header selector.
 
 ## Autocomplete
 

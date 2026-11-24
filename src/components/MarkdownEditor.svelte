@@ -31,6 +31,7 @@
   import { loadOpenTasksWithId, taskReferenceCompletionSource } from '../lib/task-refs';
   import { taskAutoSuggest } from '../lib/task-suggest';
   import { tagAutoSuggest } from '../lib/tag-suggest';
+  import { codeLanguageCompletionSource } from '../lib/code-lang';
   import { taskQueryFind } from '../lib/task-query-find';
   import { listEditing } from '../lib/list-edit';
   let {
@@ -61,14 +62,15 @@
   let host: HTMLDivElement;
   let view: EditorView | undefined;
   const codeHighlightStyle = HighlightStyle.define([
-    { tag: [tags.keyword, tags.modifier, tags.operatorKeyword], color: 'var(--hl-keyword)' },
+    { tag: [tags.keyword, tags.modifier, tags.operatorKeyword, tags.tagName], color: 'var(--hl-keyword)' },
     { tag: [tags.string, tags.regexp, tags.special(tags.string)], color: 'var(--hl-string)' },
     { tag: [tags.number, tags.bool], color: 'var(--hl-number)' },
-    { tag: [tags.null, tags.invalid], color: 'var(--hl-null)' },
+    { tag: [tags.null, tags.invalid, tags.atom, tags.self], color: 'var(--hl-null)' },
     { tag: [tags.comment, tags.meta], color: 'var(--text-dim)', fontStyle: 'italic' },
-    { tag: [tags.function(tags.variableName), tags.definition(tags.variableName)], color: 'var(--accent)' },
-    { tag: [tags.typeName, tags.className], color: 'var(--cal-tip)' },
-    { tag: [tags.punctuation, tags.bracket], color: 'var(--hl-punct)' },
+    { tag: [tags.function(tags.variableName), tags.function(tags.propertyName), tags.definition(tags.variableName), tags.definition(tags.propertyName)], color: 'var(--accent)' },
+    { tag: [tags.typeName, tags.className, tags.namespace, tags.macroName], color: 'var(--cal-tip)' },
+    { tag: [tags.propertyName, tags.attributeName, tags.labelName], color: 'var(--hl-key)' },
+    { tag: [tags.operator, tags.punctuation, tags.bracket], color: 'var(--hl-punct)' },
   ]);
 
   onMount(() => {
@@ -100,6 +102,7 @@
               taskReferenceCompletionSource(files),
               taskAutoSuggest({ loadTasksWithId: loadOpenTasksWithId }),
               tagAutoSuggest(),
+              codeLanguageCompletionSource(),
             ],
             activateOnTyping: true,
             maxRenderedOptions: 30,
