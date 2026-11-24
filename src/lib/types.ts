@@ -3,6 +3,7 @@ export type Vault = { name: string; path: string; icon?: string };
 export type VaultsInfo = { vaults: Vault[]; active: string | null; default: string };
 export type SearchMode = 'all' | 'title' | 'content' | 'tags' | 'links';
 export type SearchResult = { path: string; match?: string; snippet?: string; tags?: string[]; direction?: string };
+export type TagEntry = { tag: string; count: number };
 export type RecentSort = 'modified' | 'created';
 export type RecentFile = { path: string; name: string; modified: number; created: number };
 export type LinksIndex = Record<string, { links_to: string[]; linked_from: string[] }>;

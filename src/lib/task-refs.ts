@@ -1,4 +1,4 @@
-import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult, type CompletionSource } from '@codemirror/autocomplete';
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { api } from './api';
@@ -62,9 +62,20 @@ function insertReference(view: EditorView, task: TaskRecord, from: number, to: n
   });
 }
 
-/** Autocomplete that inserts `![[Note#^id]]` for an open task, adding the block ID to its source line if needed. */
-export function taskReferencePicker(files: () => ReadonlySet<string>): Extension {
-  const source = async (context: CompletionContext): Promise<CompletionResult | null> => {
+/** Open vault tasks that declare a Tasks `🆔` identifier (used by `depends on` autocomplete). */
+export async function loadOpenTasksWithId(): Promise<{ id: string; description: string }[]> {
+  const tasks = await loadOpenTasks();
+  const out: { id: string; description: string }[] = [];
+  for (const task of tasks) {
+    const match = /🆔\s*([A-Za-z0-9_-]+)/u.exec(task.location.expected);
+    if (match) out.push({ id: match[1], description: taskLabel(task.description) || match[1] });
+  }
+  return out;
+}
+
+/** Completion source that inserts `![[Note#^id]]` for an open task, adding the block ID to its source line if needed. */
+export function taskReferenceCompletionSource(files: () => ReadonlySet<string>): CompletionSource {
+  return async (context: CompletionContext): Promise<CompletionResult | null> => {
     const match = context.matchBefore(PICKER_TRIGGER);
     if (!match) return null;
     const queryStart = match.from + match.text.indexOf('^^') + 2;
@@ -77,5 +88,9 @@ export function taskReferencePicker(files: () => ReadonlySet<string>): Extension
     }));
     return { from: queryStart, options, filter: true };
   };
-  return autocompletion({ override: [source], activateOnTyping: true, maxRenderedOptions: 30 });
+}
+
+/** Autocomplete that inserts `![[Note#^id]]` for an open task, adding the block ID to its source line if needed. */
+export function taskReferencePicker(files: () => ReadonlySet<string>): Extension {
+  return autocompletion({ override: [taskReferenceCompletionSource(files)], activateOnTyping: true, maxRenderedOptions: 30 });
 }

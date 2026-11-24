@@ -25,6 +25,7 @@ This is the minimum contract that must survive frontend migration. It does not f
 | `GET /api/settings` | None | `{ "preferences", "vault_settings" }` for the active vault |
 | `GET /api/vaults` | None | `VaultsInfo`: `{ "vaults": Vault[], "active": string | null, "default": string }` |
 | `GET /api/search?q=...&mode=...` | `all`, `title`, `content`, `tags`, or `links` | `{ "results": SearchResult[] }` |
+| `GET /api/tags` | None | `{ "tags": [{ "tag": string, "count": int }] }` (frontmatter and inline tags, sorted by count descending) |
 | `GET /api/tasks?query=...&source=...` | Optional Tasks query and source note path | Task query result for the active vault |
 | `GET /api/tasks/block?path=...&id=...` | Note path and block ID | `{ "task": TaskRecord }` for the task line ending in `^id`; `404` when absent |
 

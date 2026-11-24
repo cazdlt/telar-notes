@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
+import re
+import threading
+from collections import Counter
 from typing import Any
 
 from telar.links import load_links_index
 from telar.vault import iter_notes, parse_frontmatter
+
+_FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+_INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+_INLINE_TAG_RE = re.compile(r"(?:^|[\s(])#([\w/-]+)")
+_TAG_INDEX_CACHE: dict[str, dict[str, tuple[tuple[int, int], set[str]]]] = {}
+_TAG_CACHE_LOCK = threading.Lock()
 
 
 def title_search(vault: pathlib.Path, query: str) -> list[dict[str, Any]]:
@@ -138,3 +148,85 @@ def search_notes(vault: pathlib.Path, query: str, mode: str) -> list[dict[str, A
         return results
 
     return []
+
+
+def extract_tags(content: str) -> set[str]:
+    """Extract unique Obsidian tags from YAML frontmatter and inline body text."""
+    found: set[str] = set()
+    fm = parse_frontmatter(content)
+    tags_raw = fm.get("tags")
+    if isinstance(tags_raw, list):
+        candidates = [str(tag).strip().lstrip("#") for tag in tags_raw]
+    elif isinstance(tags_raw, str):
+        candidates = [
+            tag.strip().strip("[]").lstrip("#") for tag in tags_raw.split(",")
+        ]
+    else:
+        candidates = []
+    for tag in candidates:
+        cleaned = tag.strip("/")
+        if cleaned and any(ch.isalpha() or ch in "_-" for ch in cleaned):
+            found.add(cleaned)
+
+    lines = content.splitlines()
+    start = 0
+    if lines and lines[0].rstrip() == "---":
+        for idx in range(1, len(lines)):
+            if lines[idx].rstrip() in {"---", "..."}:
+                start = idx + 1
+                break
+
+    fence_char: str | None = None
+    fence_len = 0
+    for line in lines[start:]:
+        fence_match = _FENCE_RE.match(line)
+        if fence_match:
+            marker = fence_match.group(1)
+            if fence_char is None:
+                fence_char, fence_len = marker[0], len(marker)
+            elif marker[0] == fence_char and len(marker) >= fence_len:
+                fence_char, fence_len = None, 0
+            continue
+        if fence_char is not None:
+            continue
+        stripped = _INLINE_CODE_RE.sub("", line)
+        for match in _INLINE_TAG_RE.finditer(stripped):
+            tag = match.group(1).strip("/")
+            if tag and any(ch.isalpha() or ch in "_-" for ch in tag):
+                found.add(tag)
+    return found
+
+
+def collect_tags(vault: pathlib.Path) -> list[dict[str, Any]]:
+    """Return all tags in the vault with note counts, cached incrementally by file stat."""
+    vault_root = vault.resolve()
+    vault_key = str(vault_root)
+    with _TAG_CACHE_LOCK:
+        previous = dict(_TAG_INDEX_CACHE.get(vault_key, {}))
+    current: dict[str, tuple[tuple[int, int], set[str]]] = {}
+    counts: Counter[str] = Counter()
+    for path, rel in iter_notes(vault):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            continue
+        marker = (stat.st_mtime_ns, stat.st_size)
+        entry = previous.get(rel)
+        if entry and entry[0] == marker:
+            tags = entry[1]
+        else:
+            try:
+                text = path.read_text(errors="replace")
+            except OSError:
+                continue
+            tags = extract_tags(text)
+        current[rel] = (marker, tags)
+        counts.update(tags)
+    with _TAG_CACHE_LOCK:
+        _TAG_INDEX_CACHE[vault_key] = current
+    return [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0].lower())
+        )
+    ]

@@ -32,3 +32,38 @@ def test_search_all_combines_title_and_content_matches(api):
         "path": "gamma.md",
         "snippet": "only body mentions alpha here",
     }
+
+
+def test_tags_endpoint_collects_frontmatter_and_inline_tags(api):
+    (api.work / "tagged.md").write_text(
+        "---\n"
+        "tags: [project/alpha, work]\n"
+        "---\n"
+        "# Heading Not A Tag\n"
+        "- [ ] Ship #urgent and #project/alpha (#backend)\n"
+        "See https://example.com#anchor and #1234 and `#code-tag`\n"
+        "```python\n"
+        "#fenced-tag\n"
+        "```\n"
+    )
+
+    status, body = api.request("GET", "/api/tags")
+    assert status == 200
+    by_tag = {entry["tag"]: entry["count"] for entry in body["tags"]}
+    assert by_tag["project/alpha"] == 1
+    assert by_tag["urgent"] == 1
+    assert by_tag["backend"] == 1
+    assert by_tag["work"] >= 2
+    assert "Heading" not in by_tag
+    assert "anchor" not in by_tag
+    assert "1234" not in by_tag
+    assert "code-tag" not in by_tag
+    assert "fenced-tag" not in by_tag
+
+    # Editing the file invalidates its cached entry via stat marker.
+    (api.work / "tagged.md").write_text("- [ ] Updated #fresh-tag\n")
+    status, body = api.request("GET", "/api/tags")
+    assert status == 200
+    updated_tags = {entry["tag"] for entry in body["tags"]}
+    assert "fresh-tag" in updated_tags
+    assert "urgent" not in updated_tags

@@ -25,9 +25,12 @@
   import { markdown } from '@codemirror/lang-markdown';
   import { languages } from '@codemirror/language-data';
   import { tags } from '@lezer/highlight';
+  import { autocompletion } from '@codemirror/autocomplete';
   import { createLivePreview } from '../lib/live-preview';
   import { ObsidianGFM } from '../lib/tasks';
-  import { taskReferencePicker } from '../lib/task-refs';
+  import { loadOpenTasksWithId, taskReferenceCompletionSource } from '../lib/task-refs';
+  import { taskAutoSuggest } from '../lib/task-suggest';
+  import { tagAutoSuggest } from '../lib/tag-suggest';
   import { taskQueryFind } from '../lib/task-query-find';
   import { listEditing } from '../lib/list-edit';
   let {
@@ -92,7 +95,15 @@
             openDrawing: onOpenDrawing,
             missingLink: onMissingLink,
           }),
-          taskReferencePicker(files),
+          autocompletion({
+            override: [
+              taskReferenceCompletionSource(files),
+              taskAutoSuggest({ loadTasksWithId: loadOpenTasksWithId }),
+              tagAutoSuggest(),
+            ],
+            activateOnTyping: true,
+            maxRenderedOptions: 30,
+          }),
           history(),
           drawSelection(),
           search({ top: true }),
