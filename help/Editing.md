@@ -14,6 +14,12 @@ Links, tables, embeds, task queries, diagrams and task references are widgets. H
 - `![[Note]]` embeds a note, `![[Note#Heading]]` a section, `![[Note#^id]]` one block.
 - Tables, Mermaid fences (` ```mermaid `) and tasks queries render in place.
 
+## Autocomplete
+
+- Type `#` anywhere outside headings, frontmatter, and code blocks to autocomplete tags from the vault and current note.
+- Type `[[^^` to search open tasks and insert a block reference.
+- On task lines, type keywords like `due martes`, `start sunday`, `high`, or `every week` to insert Obsidian Tasks metadata (see [[Tasks]]).
+
 ## Reading mode
 
 Switch to reading mode for a clean, non-editable view of the note.
